@@ -12,5 +12,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Phase 0 initializes repository architecture only.
-# Feature targets are added in later phases when their modules are implemented.
+# Phase 1 adds the first runtime/core/platform skeleton.
+add_subdirectory(engine/Platform)
+add_subdirectory(engine/Core)
+add_subdirectory(apps/CookieRuntime)
