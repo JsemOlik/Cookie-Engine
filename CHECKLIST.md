@@ -55,6 +55,7 @@ Status: completed (skeleton scope)
 - [x] Shortened vcpkg preset build/install directories to avoid deep-path Qt build failures on Windows.
 - [x] Added compile-time source-root fallback so runtime resolves `config/` and `content/` correctly from short build directories.
 - [x] Added Windows post-build Qt plugin copy for `CookieEditor` (platform/style) from vcpkg tree.
+- [x] Switched editor plugin deployment to copy plugin directories (handles debug/release Qt plugin naming differences).
 - [x] Updated `build.bat` to wait for Enter before closing so build output remains visible.
 - [x] Updated `build.bat` to auto-detect Ninja (PATH or Visual Studio bundled) and pass `CMAKE_MAKE_PROGRAM`.
 - [x] Updated `build.bat` to auto-load Visual Studio `VsDevCmd` when `cl.exe` is missing.
@@ -135,6 +136,7 @@ Status: completed (skeleton scope)
 - vcpkg presets now use `C:\ce-build\...` and `C:\ce-install\...` for shorter Windows paths.
 - Runtime now uses compile-time repo root as first path-resolution candidate when working directory is outside source tree.
 - CookieEditor now copies `qwindows*.dll` and `qmodernwindowsstyle*.dll` from vcpkg plugin folders during post-build.
+- CookieEditor plugin deployment now copies full `platforms/` and `styles/` directories to avoid hardcoded DLL-name mismatches.
 - `build.bat` now pauses with `Press Enter to close...` on both success and failure paths.
 - `build.bat` now injects `-DCMAKE_MAKE_PROGRAM=<ninja-path>` during configure to avoid `CMAKE_MAKE_PROGRAM is not set`.
 - `build.bat` now attempts to bootstrap MSVC environment automatically via `VsDevCmd.bat`.

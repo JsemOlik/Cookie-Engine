@@ -39,12 +39,12 @@ if(WIN32)
   add_custom_command(TARGET CookieEditor POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:CookieEditor>/platforms"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:CookieEditor>/styles"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${QT_PLUGIN_DIR}/platforms/qwindows$<$<CONFIG:Debug>:d>.dll"
-            "$<TARGET_FILE_DIR:CookieEditor>/platforms/"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${QT_PLUGIN_DIR}/styles/qmodernwindowsstyle$<$<CONFIG:Debug>:d>.dll"
-            "$<TARGET_FILE_DIR:CookieEditor>/styles/"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${QT_PLUGIN_DIR}/platforms"
+            "$<TARGET_FILE_DIR:CookieEditor>/platforms"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${QT_PLUGIN_DIR}/styles"
+            "$<TARGET_FILE_DIR:CookieEditor>/styles"
     COMMENT "Copying Qt platform/style plugins for CookieEditor"
     VERBATIM
   )
