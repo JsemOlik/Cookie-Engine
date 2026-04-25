@@ -54,7 +54,7 @@ Status: completed (skeleton scope)
 - [x] Added root `build.bat` to clean and rebuild via vcpkg presets.
 - [x] Shortened vcpkg preset build/install directories to avoid deep-path Qt build failures on Windows.
 - [x] Added compile-time source-root fallback so runtime resolves `config/` and `content/` correctly from short build directories.
-- [x] Added `windeployqt` post-build deployment for `CookieEditor` on Windows.
+- [x] Added Windows post-build Qt plugin copy for `CookieEditor` (platform/style) from vcpkg tree.
 - [x] Updated `build.bat` to wait for Enter before closing so build output remains visible.
 - [x] Updated `build.bat` to auto-detect Ninja (PATH or Visual Studio bundled) and pass `CMAKE_MAKE_PROGRAM`.
 - [x] Updated `build.bat` to auto-load Visual Studio `VsDevCmd` when `cl.exe` is missing.
@@ -105,6 +105,7 @@ Status: completed (skeleton scope)
 - [ ] Run `CookieEditor` and confirm dock panels open:
   - `Hierarchy`, `Inspector`, `Asset Browser`, `Console`, `Game Viewport`
 - [ ] Confirm `CookieEditor.exe` launches directly without Qt platform plugin error.
+- [ ] Confirm `CookieEditor.exe` launches directly without Qt platform plugin error after plugin copy step.
 - [ ] Confirm runtime log `Project root` points to repo root (not `C:\ce-build\...`) and `content/base.pak` mounts successfully.
 - [ ] Run `build.bat` (default) and confirm it cleans previous outputs then configures/builds with `x64-debug-vcpkg`.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
@@ -133,6 +134,7 @@ Status: completed (skeleton scope)
 - `build.bat` defaults to `x64-debug-vcpkg`; pass `x64-release-vcpkg` as argument for release builds.
 - vcpkg presets now use `C:\ce-build\...` and `C:\ce-install\...` for shorter Windows paths.
 - Runtime now uses compile-time repo root as first path-resolution candidate when working directory is outside source tree.
+- CookieEditor now copies `qwindows*.dll` and `qmodernwindowsstyle*.dll` from vcpkg plugin folders during post-build.
 - `build.bat` now pauses with `Press Enter to close...` on both success and failure paths.
 - `build.bat` now injects `-DCMAKE_MAKE_PROGRAM=<ninja-path>` during configure to avoid `CMAKE_MAKE_PROGRAM is not set`.
 - `build.bat` now attempts to bootstrap MSVC environment automatically via `VsDevCmd.bat`.

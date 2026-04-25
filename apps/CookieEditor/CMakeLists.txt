@@ -28,20 +28,24 @@ target_link_libraries(CookieEditor
 target_compile_features(CookieEditor PRIVATE cxx_std_20)
 
 if(WIN32)
-  get_target_property(QT6_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
-  get_filename_component(QT6_BIN_DIR "${QT6_QMAKE_EXECUTABLE}" DIRECTORY)
-  find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${QT6_BIN_DIR}")
+  set(VCPKG_QT_ROOT "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows")
 
-  if(WINDEPLOYQT_EXECUTABLE)
-    add_custom_command(TARGET CookieEditor POST_BUILD
-      COMMAND "${WINDEPLOYQT_EXECUTABLE}"
-              --dir "$<TARGET_FILE_DIR:CookieEditor>"
-              --no-compiler-runtime
-              "$<TARGET_FILE:CookieEditor>"
-      COMMENT "Deploying Qt runtime for CookieEditor"
-      VERBATIM
-    )
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(QT_PLUGIN_DIR "${VCPKG_QT_ROOT}/debug/plugins")
   else()
-    message(WARNING "windeployqt not found; CookieEditor may fail to launch outside IDE.")
+    set(QT_PLUGIN_DIR "${VCPKG_QT_ROOT}/plugins")
   endif()
+
+  add_custom_command(TARGET CookieEditor POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:CookieEditor>/platforms"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:CookieEditor>/styles"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${QT_PLUGIN_DIR}/platforms/qwindows$<$<CONFIG:Debug>:d>.dll"
+            "$<TARGET_FILE_DIR:CookieEditor>/platforms/"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${QT_PLUGIN_DIR}/styles/qmodernwindowsstyle$<$<CONFIG:Debug>:d>.dll"
+            "$<TARGET_FILE_DIR:CookieEditor>/styles/"
+    COMMENT "Copying Qt platform/style plugins for CookieEditor"
+    VERBATIM
+  )
 endif()
