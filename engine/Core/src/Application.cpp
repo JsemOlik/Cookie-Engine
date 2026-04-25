@@ -16,9 +16,11 @@ namespace cookie::core {
 
 Application::Application(
     ApplicationConfig config,
+    std::unique_ptr<cookie::core::IAudioBackend> audio_backend,
     std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend,
     std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend)
     : config_(std::move(config)),
+      audio_backend_(std::move(audio_backend)),
       physics_backend_(std::move(physics_backend)),
       renderer_backend_(std::move(renderer_backend)) {}
 
@@ -44,6 +46,12 @@ int Application::Run() const {
   }
   if (!config_.physics_module_path.empty()) {
     logger.Info("Physics module path: " + config_.physics_module_path);
+  }
+  if (!config_.audio_runtime_source.empty()) {
+    logger.Info("Audio runtime source: " + config_.audio_runtime_source);
+  }
+  if (!config_.audio_module_path.empty()) {
+    logger.Info("Audio module path: " + config_.audio_module_path);
   }
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
@@ -82,15 +90,27 @@ int Application::Run() const {
     logger.Error("No renderer backend instance is available.");
     return 2;
   }
-  if (!physics_backend_) {
-    logger.Error("No physics backend instance is available.");
+  if (!audio_backend_) {
+    logger.Error("No audio backend instance is available.");
     return 3;
   }
+  if (!physics_backend_) {
+    logger.Error("No physics backend instance is available.");
+    return 4;
+  }
+
+  logger.Info("Initializing audio backend.");
+  if (!audio_backend_->Initialize()) {
+    logger.Error("Audio backend failed to initialize.");
+    return 5;
+  }
+  logger.Info("Audio backend initialized successfully.");
 
   logger.Info("Initializing physics backend.");
   if (!physics_backend_->Initialize()) {
     logger.Error("Physics backend failed to initialize.");
-    return 4;
+    audio_backend_->Shutdown();
+    return 6;
   }
   logger.Info("Physics backend initialized successfully.");
 
@@ -99,7 +119,8 @@ int Application::Run() const {
   if (!renderer_backend_->Initialize()) {
     logger.Error("Renderer backend failed to initialize.");
     physics_backend_->Shutdown();
-    return 5;
+    audio_backend_->Shutdown();
+    return 7;
   }
   logger.Info("Renderer backend initialized successfully.");
 
@@ -112,7 +133,8 @@ int Application::Run() const {
     logger.Error("Platform window creation failed.");
     renderer_backend_->Shutdown();
     physics_backend_->Shutdown();
-    return 6;
+    audio_backend_->Shutdown();
+    return 8;
   }
 
   logger.Info("Platform window created successfully.");
@@ -144,6 +166,9 @@ int Application::Run() const {
         physics_backend_->StepSimulation({
             .delta_time_seconds = 1.0f / 60.0f,
         });
+    audio_backend_->Update({
+        .delta_time_seconds = 1.0f / 60.0f,
+    });
 
     if (game_logic.IsLoaded()) {
       game_logic.Update(1.0f / 60.0f);
@@ -177,7 +202,9 @@ int Application::Run() const {
   logger.Info("Renderer backend shut down successfully.");
   physics_backend_->Shutdown();
   logger.Info("Physics backend shut down successfully.");
-  logger.Info("Phase 10 skeleton complete. Renderer and physics module loader contracts wired.");
+  audio_backend_->Shutdown();
+  logger.Info("Audio backend shut down successfully.");
+  logger.Info("Phase 11 skeleton complete. Renderer, physics, and audio module loader contracts wired.");
 
   return 0;
 }

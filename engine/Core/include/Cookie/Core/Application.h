@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "Cookie/Core/AudioBackend.h"
 #include "Cookie/Core/PhysicsBackend.h"
 #include "Cookie/Renderer/RendererBackend.h"
 
@@ -15,6 +16,8 @@ struct ApplicationConfig {
   std::string renderer_module_path;
   std::string physics_runtime_source;
   std::string physics_module_path;
+  std::string audio_runtime_source;
+  std::string audio_module_path;
   std::string window_title;
   int window_width = 1280;
   int window_height = 720;
@@ -25,6 +28,7 @@ struct ApplicationConfig {
 class Application {
  public:
   Application(ApplicationConfig config,
+              std::unique_ptr<cookie::core::IAudioBackend> audio_backend,
               std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend,
               std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend);
 
@@ -32,6 +36,7 @@ class Application {
 
  private:
   ApplicationConfig config_;
+  std::unique_ptr<cookie::core::IAudioBackend> audio_backend_;
   std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend_;
   std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend_;
 };

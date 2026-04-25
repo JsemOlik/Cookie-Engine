@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 10 - Runtime Module Loader (Physics Slice)
+## Current Phase: Phase 11 - Runtime Module Loader (Audio Slice)
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -84,6 +84,13 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added explicit startup logs for physics runtime source (`module` vs `static-fallback`) and resolved module path.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_physics_module`.
 - [x] Updated export tool to warn when expected module DLLs (`RendererDX11.dll`, `Physics.dll`) are missing at export source.
+- [x] Added core audio backend interface contract (`IAudioBackend`) with initialize/update/shutdown lifecycle.
+- [x] Added `Audio` static fallback backend (`CreateNullAudioBackend`).
+- [x] Added `Audio` shared module target (`Audio.dll`) with exported create/destroy backend symbols.
+- [x] Updated runtime bootstrap to try dynamic audio module loading using engine config, with static null-audio fallback.
+- [x] Added explicit startup logs for audio runtime source (`module` vs `static-fallback`) and resolved module path.
+- [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_audio_module`.
+- [x] Updated export tool to warn when `Audio.dll` is missing at export source.
 
 ## Not Started
 
@@ -161,6 +168,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Confirm runtime logs include `Physics runtime source: module` when `Physics.dll` is loaded.
 - [ ] Confirm runtime logs include `Physics runtime source: static-fallback` when `Physics.dll` is unavailable.
 - [ ] Run `CookieExportTool` and confirm exported `bin/Physics.dll` exists.
+- [ ] Build and run `CookieRuntime`, then confirm audio initializes when `Audio.dll` is present in runtime `bin/`.
+- [ ] Temporarily rename runtime `bin/Audio.dll` and confirm runtime still starts via static fallback path.
+- [ ] Confirm runtime logs include `Audio runtime source: module` when `Audio.dll` is loaded.
+- [ ] Confirm runtime logs include `Audio runtime source: static-fallback` when `Audio.dll` is unavailable.
+- [ ] Run `CookieExportTool` and confirm exported `bin/Audio.dll` exists.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -196,20 +208,22 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 7 adds dynamic game module loading shape without introducing scripting/runtime reflection yet.
 - Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
 - Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
-- Export currently reports future module placeholders (`Core.dll`, `Audio.dll`) rather than producing those DLLs yet.
+- Export currently reports future module placeholders (`Core.dll`) rather than producing those DLLs yet.
 - Runtime startup path detection now treats executable directory as project root when it contains exported `config/`, `content/`, and `logs/`.
 - Runtime now supports manifest-driven renderer module path in `engine.json`.
 - `modules/RendererDX11` now builds both static fallback library and shared module DLL for runtime loading transition.
 - Export tool now copies runtime module DLLs from `apps/CookieRuntime/bin` into exported `bin/`.
 - `modules/Physics` now builds both static fallback library and shared module DLL for runtime loading transition.
 - Runtime now supports manifest-driven physics module path in `engine.json`.
+- `modules/Audio` now builds both static fallback library and shared module DLL for runtime loading transition.
+- Runtime now supports manifest-driven audio module path in `engine.json`.
 
 ## Best Next Step
 
-Begin audio boundary planning with the same module loader pattern (`Audio.dll`) while keeping audio feature behavior as skeleton-only.
+Start preparing core/runtime DLL boundaries (`Core.dll`) and reduce static fallback usage as module loading stabilizes.
 
 ## Suggested Commit Message
 
 ```text
-feat: add manifest-driven physics module loading skeleton
+feat: add manifest-driven audio module loading skeleton
 ```

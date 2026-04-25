@@ -97,7 +97,7 @@ void WriteExportReport(
 
   report << "Future module placeholders (expected in later phases):\n";
   report << " - Core.dll\n";
-  report << " - Audio.dll\n\n";
+  report << "\n";
 
   if (!result.warnings.empty()) {
     report << "Warnings:\n";
@@ -151,6 +151,9 @@ int main(int argc, char** argv) {
     WarnIfMissing(
         runtime_build_dir / "bin" / "Physics.dll", result,
         "Expected physics module");
+    WarnIfMissing(
+        runtime_build_dir / "bin" / "Audio.dll", result,
+        "Expected audio module");
 
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);

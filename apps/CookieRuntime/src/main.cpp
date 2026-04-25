@@ -1,7 +1,9 @@
 #include "Cookie/Core/Application.h"
+#include "Cookie/Core/AudioBackend.h"
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/EngineConfig.h"
 #include "Cookie/Core/PhysicsBackend.h"
+#include "Cookie/Audio/NullAudioBackend.h"
 #include "Cookie/Platform/PlatformLibrary.h"
 #include "Cookie/Platform/PlatformPaths.h"
 #include "Cookie/Physics/JoltPhysicsBackend.h"
@@ -17,11 +19,15 @@ namespace {
 
 using RendererCreateFn = cookie::renderer::IRendererBackend* (*)();
 using RendererDestroyFn = void (*)(cookie::renderer::IRendererBackend*);
+using AudioCreateFn = cookie::core::IAudioBackend* (*)();
+using AudioDestroyFn = void (*)(cookie::core::IAudioBackend*);
 using PhysicsCreateFn = cookie::core::IPhysicsBackend* (*)();
 using PhysicsDestroyFn = void (*)(cookie::core::IPhysicsBackend*);
 
 constexpr const char* kCreateRendererSymbol = "CookieCreateRendererBackend";
 constexpr const char* kDestroyRendererSymbol = "CookieDestroyRendererBackend";
+constexpr const char* kCreateAudioSymbol = "CookieCreateAudioBackend";
+constexpr const char* kDestroyAudioSymbol = "CookieDestroyAudioBackend";
 constexpr const char* kCreatePhysicsSymbol = "CookieCreatePhysicsBackend";
 constexpr const char* kDestroyPhysicsSymbol = "CookieDestroyPhysicsBackend";
 
@@ -33,6 +39,12 @@ struct RendererBootstrapResult {
 
 struct PhysicsBootstrapResult {
   std::unique_ptr<cookie::core::IPhysicsBackend> backend;
+  std::string runtime_source;
+  std::string module_path;
+};
+
+struct AudioBootstrapResult {
+  std::unique_ptr<cookie::core::IAudioBackend> backend;
   std::string runtime_source;
   std::string module_path;
 };
@@ -146,6 +158,44 @@ class DynamicPhysicsProxy final : public cookie::core::IPhysicsBackend {
   PhysicsDestroyFn destroy_ = nullptr;
 };
 
+class DynamicAudioProxy final : public cookie::core::IAudioBackend {
+ public:
+  DynamicAudioProxy(
+      cookie::platform::LibraryHandle module,
+      cookie::core::IAudioBackend* backend, AudioDestroyFn destroy)
+      : module_(module), backend_(backend), destroy_(destroy) {}
+
+  ~DynamicAudioProxy() override {
+    if (backend_ && destroy_) {
+      destroy_(backend_);
+    }
+    if (module_) {
+      cookie::platform::UnloadDynamicLibrary(module_);
+    }
+  }
+
+  bool Initialize() override {
+    return backend_ && backend_->Initialize();
+  }
+
+  void Update(const cookie::core::AudioUpdateConfig& config) override {
+    if (backend_) {
+      backend_->Update(config);
+    }
+  }
+
+  void Shutdown() override {
+    if (backend_) {
+      backend_->Shutdown();
+    }
+  }
+
+ private:
+  cookie::platform::LibraryHandle module_ = nullptr;
+  cookie::core::IAudioBackend* backend_ = nullptr;
+  AudioDestroyFn destroy_ = nullptr;
+};
+
 std::unique_ptr<cookie::renderer::IRendererBackend> TryCreateRendererFromModule(
     const std::filesystem::path& module_path) {
   const auto module = cookie::platform::LoadDynamicLibrary(module_path);
@@ -194,6 +244,31 @@ std::unique_ptr<cookie::core::IPhysicsBackend> TryCreatePhysicsFromModule(
   }
 
   return std::make_unique<DynamicPhysicsProxy>(module, backend, destroy_fn);
+}
+
+std::unique_ptr<cookie::core::IAudioBackend> TryCreateAudioFromModule(
+    const std::filesystem::path& module_path) {
+  const auto module = cookie::platform::LoadDynamicLibrary(module_path);
+  if (!module) {
+    return nullptr;
+  }
+
+  const auto create_fn = reinterpret_cast<AudioCreateFn>(
+      cookie::platform::GetLibrarySymbol(module, kCreateAudioSymbol));
+  const auto destroy_fn = reinterpret_cast<AudioDestroyFn>(
+      cookie::platform::GetLibrarySymbol(module, kDestroyAudioSymbol));
+  if (!create_fn || !destroy_fn) {
+    cookie::platform::UnloadDynamicLibrary(module);
+    return nullptr;
+  }
+
+  auto* backend = create_fn();
+  if (!backend) {
+    cookie::platform::UnloadDynamicLibrary(module);
+    return nullptr;
+  }
+
+  return std::make_unique<DynamicAudioProxy>(module, backend, destroy_fn);
 }
 
 RendererBootstrapResult CreateRendererBackend(
@@ -261,6 +336,35 @@ PhysicsBootstrapResult CreatePhysicsBackend(
   };
 }
 
+AudioBootstrapResult CreateAudioBackend(
+    const cookie::core::EngineConfig& engine_config,
+    const cookie::core::StartupPaths& paths) {
+  const auto from_project_root =
+      ResolveModulePath(paths.project_root, engine_config.audio_module);
+  if (auto module_backend = TryCreateAudioFromModule(from_project_root)) {
+    return {
+        .backend = std::move(module_backend),
+        .runtime_source = "module",
+        .module_path = from_project_root.string(),
+    };
+  }
+
+  const auto from_runtime_dir = ResolveModulePath(
+      cookie::platform::GetExecutableDirectory(), engine_config.audio_module);
+  if (auto module_backend = TryCreateAudioFromModule(from_runtime_dir)) {
+    return {
+        .backend = std::move(module_backend),
+        .runtime_source = "module",
+        .module_path = from_runtime_dir.string(),
+    };
+  }
+
+  return {
+      .backend = cookie::audio::CreateNullAudioBackend(),
+      .runtime_source = "static-fallback",
+  };
+}
+
 } // namespace
 
 int main() {
@@ -271,6 +375,7 @@ int main() {
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
   auto renderer_bootstrap =
       CreateRendererBackend(renderer_config.backend_name, engine_config, paths);
+  auto audio_bootstrap = CreateAudioBackend(engine_config, paths);
   auto physics_bootstrap = CreatePhysicsBackend(engine_config, paths);
 
   cookie::core::Application app({
@@ -280,12 +385,15 @@ int main() {
       .renderer_module_path = renderer_bootstrap.module_path,
       .physics_runtime_source = physics_bootstrap.runtime_source,
       .physics_module_path = physics_bootstrap.module_path,
+      .audio_runtime_source = audio_bootstrap.runtime_source,
+      .audio_module_path = audio_bootstrap.module_path,
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
-  }, std::move(physics_bootstrap.backend), std::move(renderer_bootstrap.backend));
+  }, std::move(audio_bootstrap.backend), std::move(physics_bootstrap.backend),
+     std::move(renderer_bootstrap.backend));
 
   return app.Run();
 }

@@ -223,6 +223,12 @@ Migrate physics runtime creation to the same manifest-driven DLL pattern as rend
 
 Milestone: runtime can read physics module path from `engine.json`, load `Physics.dll` through exported factory symbols, and still fall back to static `CreateJoltPhysicsBackend()` when DLL loading fails.
 
+### [x] Phase 11: Audio Module Loader Skeleton
+
+Migrate audio runtime creation to the same manifest-driven DLL pattern as renderer and physics, with a static null-audio fallback during transition.
+
+Milestone: runtime can read audio module path from `engine.json`, load `Audio.dll` through exported factory symbols, and still fall back to static `CreateNullAudioBackend()` when DLL loading fails.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.
