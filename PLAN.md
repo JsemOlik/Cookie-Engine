@@ -271,6 +271,12 @@ Introduce API-neutral scene submission contracts in renderer interfaces and driv
 
 Milestone: runtime submits scene/camera/instance data each frame through renderer abstraction, and DX11 renders that submitted scene with per-instance transforms.
 
+### [x] Phase 19: Renderer Scene Builder Utilities
+
+Add reusable renderer-side utilities for scene composition (transform helpers, primitive mesh generation, and scene builder assembly) so runtime/editor paths can share render-scene construction logic.
+
+Milestone: runtime triangle scene is built through `engine/Renderer` scene-builder APIs rather than inline hardcoded scene assembly in `Application`.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

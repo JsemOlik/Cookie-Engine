@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 18 - Engine-Driven Scene Submission
+## Current Phase: Phase 19 - Renderer Scene Builder Utilities
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -122,6 +122,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Updated runtime frame loop to submit camera + mesh instance data each frame through renderer abstraction.
 - [x] Updated DX11 backend to render submitted scene instances (dynamic vertex upload + per-instance constant buffer transforms).
 - [x] Updated runtime phase milestone log to Phase 18 completion text.
+- [x] Added renderer transform utilities (`Identity`, `RotationZ`, `Translation`, `Scale`, matrix multiply).
+- [x] Added renderer primitive helper for reusable colored triangle mesh generation.
+- [x] Added renderer `SceneBuilder` utility for API-neutral scene assembly and stable `RenderScene` build output.
+- [x] Migrated runtime scene assembly from inline arrays/structs to renderer-side `SceneBuilder` + primitive/transform helpers.
+- [x] Updated runtime phase milestone log to Phase 19 completion text.
 
 ## Not Started
 
@@ -231,6 +236,8 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm submitted scene still renders after removing hardcoded DX11 geometry path.
 - [ ] Confirm triangle rotates over time (runtime-driven model transform) while renderer remains backend-agnostic at interface boundary.
 - [ ] Confirm runtime and exported game logs now end with `Phase 18 complete. Engine-driven render scene contract wired.`.
+- [ ] Confirm runtime and exported game logs now end with `Phase 19 complete. Renderer scene-builder utilities wired.`.
+- [ ] Confirm removing or changing primitive/transform helper inputs in `engine/Renderer` affects runtime rendering without DX11 backend code changes.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -286,13 +293,14 @@ Status: completed (skeleton scope, pending local build verification)
 - `RendererDX11` now owns real D3D11 frame presentation lifecycle (CreateDeviceAndSwapChain, RTV clear, Present).
 - Phase 17 now adds the first true draw pipeline in DX11 (shader compile, vertex layout, vertex buffer, triangle draw).
 - Phase 18 now routes render data through engine-owned scene contracts and submits per-frame camera/instance transforms to DX11.
+- Phase 19 now centralizes render scene composition in `engine/Renderer` utilities (`Transform`, `Primitives`, `SceneBuilder`) instead of runtime inline assembly.
 
 ## Best Next Step
 
-Phase 19: move scene submission out of hardcoded runtime arrays into a small renderer-facing scene builder layer in `engine/Renderer` (reusable mesh primitives + transform utilities), then feed runtime and future editor viewport through the same path.
+Phase 20: add a small renderer-facing camera/projection utility layer (orthographic + perspective builders), then use it to introduce a basic world-vs-screen-space example scene for runtime and editor viewport parity.
 
 ## Suggested Commit Message
 
 ```text
-feat: add engine-driven scene submission for dx11 rendering
+feat: add renderer scene-builder utilities for runtime scene composition
 ```

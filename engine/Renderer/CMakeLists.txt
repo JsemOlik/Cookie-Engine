@@ -1,5 +1,8 @@
 add_library(cookie_renderer STATIC
+  src/Primitives.cpp
+  src/SceneBuilder.cpp
   src/RendererConfig.cpp
+  src/Transform.cpp
 )
 
 target_include_directories(cookie_renderer

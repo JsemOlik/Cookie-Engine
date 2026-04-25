@@ -1,8 +1,6 @@
 #include "Cookie/Core/Application.h"
 
 #include <chrono>
-#include <cmath>
-#include <iterator>
 #include <string>
 #include <thread>
 #include <utility>
@@ -13,26 +11,11 @@
 #include "Cookie/Assets/AssetRegistry.h"
 #include "Cookie/Platform/PlatformPaths.h"
 #include "Cookie/Platform/PlatformWindow.h"
+#include "Cookie/Renderer/Primitives.h"
+#include "Cookie/Renderer/SceneBuilder.h"
+#include "Cookie/Renderer/Transform.h"
 
 namespace cookie::core {
-namespace {
-
-cookie::renderer::Float4x4 MakeIdentityMatrix() {
-  return {};
-}
-
-cookie::renderer::Float4x4 MakeZRotationMatrix(float radians) {
-  cookie::renderer::Float4x4 matrix{};
-  const float c = std::cos(radians);
-  const float s = std::sin(radians);
-  matrix.m[0] = c;
-  matrix.m[1] = s;
-  matrix.m[4] = -s;
-  matrix.m[5] = c;
-  return matrix;
-}
-
-} // namespace
 
 Application::Application(
     ApplicationConfig config,
@@ -220,11 +203,8 @@ int Application::Run() const {
   }
 
   int frame_count = 0;
-  const cookie::renderer::SceneVertex triangle_vertices[] = {
-      {{0.0f, 0.55f, 0.0f}, {1.0f, 0.2f, 0.2f, 1.0f}},
-      {{0.55f, -0.45f, 0.0f}, {0.2f, 1.0f, 0.2f, 1.0f}},
-      {{-0.55f, -0.45f, 0.0f}, {0.2f, 0.4f, 1.0f, 1.0f}},
-  };
+  cookie::renderer::SceneBuilder scene_builder;
+  const auto triangle_vertices = cookie::renderer::MakeColoredTriangle();
   while (!window->ShouldClose()) {
     window->PollEvents();
 
@@ -235,21 +215,17 @@ int Application::Run() const {
     }
 
     renderer_backend_->Clear(config_.clear_color);
-    cookie::renderer::RenderMeshInstance triangle_instance{};
-    triangle_instance.vertices = triangle_vertices;
-    triangle_instance.vertex_count = std::size(triangle_vertices);
-    triangle_instance.model_transform =
-        MakeZRotationMatrix(static_cast<float>(frame_count) * 0.01f);
-
-    const cookie::renderer::RenderScene scene{
-        .camera =
-            {
-                .view_projection = MakeIdentityMatrix(),
-            },
-        .instances = &triangle_instance,
-        .instance_count = 1,
-    };
-    renderer_backend_->SubmitScene(scene);
+    scene_builder.Reset(cookie::renderer::MakeIdentityTransform());
+    const auto model =
+        cookie::renderer::MultiplyTransforms(
+            cookie::renderer::MakeTranslationTransform(0.0f, 0.0f, 0.0f),
+            cookie::renderer::MultiplyTransforms(
+                cookie::renderer::MakeZRotationTransform(
+                    static_cast<float>(frame_count) * 0.01f),
+                cookie::renderer::MakeScaleTransform(1.0f, 1.0f, 1.0f)));
+    scene_builder.AddMeshInstance(
+        triangle_vertices.data(), triangle_vertices.size(), model);
+    renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
     ++frame_count;
@@ -295,7 +271,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 18 complete. Engine-driven render scene contract wired.");
+  logger.Info("Phase 19 complete. Renderer scene-builder utilities wired.");
 
   return 0;
 }
