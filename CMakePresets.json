@@ -33,6 +33,8 @@
       "name": "x64-debug-vcpkg",
       "displayName": "x64 Debug (vcpkg)",
       "inherits": "x64-debug",
+      "binaryDir": "C:/ce-build/x64-debug-vcpkg",
+      "installDir": "C:/ce-install/x64-debug-vcpkg",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-windows"
@@ -50,6 +52,8 @@
       "name": "x64-release-vcpkg",
       "displayName": "x64 Release (vcpkg)",
       "inherits": "x64-release",
+      "binaryDir": "C:/ce-build/x64-release-vcpkg",
+      "installDir": "C:/ce-install/x64-release-vcpkg",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-windows"

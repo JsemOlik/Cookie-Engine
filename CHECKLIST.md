@@ -52,6 +52,7 @@ Status: completed (skeleton scope)
 - [x] Added `builtin-baseline` to `vcpkg.json` for compatibility with newer manifest-mode vcpkg.
 - [x] Repinned `builtin-baseline` to a real public microsoft/vcpkg commit (`52f5569...`) after rejecting bundled-tool hash.
 - [x] Added root `build.bat` to clean and rebuild via vcpkg presets.
+- [x] Shortened vcpkg preset build/install directories to avoid deep-path Qt build failures on Windows.
 
 ## Not Started
 
@@ -123,6 +124,7 @@ Status: completed (skeleton scope)
 - Phase 6 adds editor shell scaffolding only; no scene editing, serialization, or gameplay tooling yet.
 - If `cmake --preset x64-debug-vcpkg` fails with baseline error, ensure `builtin-baseline` remains pinned in `vcpkg.json`.
 - `build.bat` defaults to `x64-debug-vcpkg`; pass `x64-release-vcpkg` as argument for release builds.
+- vcpkg presets now use `C:\ce-build\...` and `C:\ce-install\...` for shorter Windows paths.
 
 ## Best Next Step
 

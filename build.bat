@@ -8,8 +8,12 @@ if "%PRESET%"=="" set "PRESET=x64-debug-vcpkg"
 
 if /I "%PRESET%"=="x64-debug-vcpkg" (
   set "TRIPLET=x64-windows"
+  set "BUILD_DIR=C:\ce-build\x64-debug-vcpkg"
+  set "INSTALL_DIR=C:\ce-install\x64-debug-vcpkg"
 ) else if /I "%PRESET%"=="x64-release-vcpkg" (
   set "TRIPLET=x64-windows"
+  set "BUILD_DIR=C:\ce-build\x64-release-vcpkg"
+  set "INSTALL_DIR=C:\ce-install\x64-release-vcpkg"
 ) else (
   echo [ERROR] Unsupported preset "%PRESET%".
   echo [INFO] Supported presets: x64-debug-vcpkg, x64-release-vcpkg
@@ -31,9 +35,6 @@ if errorlevel 1 (
   echo [ERROR] cmake is not available on PATH.
   exit /b 1
 )
-
-set "BUILD_DIR=out\build\%PRESET%"
-set "INSTALL_DIR=out\install\%PRESET%"
 
 echo [INFO] Project root: "%cd%"
 echo [INFO] Using preset: %PRESET%
