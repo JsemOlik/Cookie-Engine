@@ -158,16 +158,6 @@ int Application::Run() const {
   }
   logger.Info("Physics backend initialized successfully.");
 
-  logger.Info("Initializing renderer backend: " +
-              std::string(renderer_backend_->Name()));
-  if (!renderer_backend_->Initialize()) {
-    logger.Error("Renderer backend failed to initialize.");
-    physics_backend_->Shutdown();
-    audio_backend_->Shutdown();
-    return 11;
-  }
-  logger.Info("Renderer backend initialized successfully.");
-
   auto window = cookie::platform::CreatePlatformWindow({
       .title = config_.window_title,
       .width = config_.window_width,
@@ -182,6 +172,23 @@ int Application::Run() const {
   }
 
   logger.Info("Platform window created successfully.");
+
+  logger.Info("Initializing renderer backend: " +
+              std::string(renderer_backend_->Name()));
+  const cookie::renderer::RendererInitInfo renderer_init{
+      .native_window_handle = window->GetNativeHandle(),
+      .window_width = config_.window_width,
+      .window_height = config_.window_height,
+      .enable_vsync = true,
+  };
+  if (!renderer_backend_->Initialize(renderer_init)) {
+    logger.Error("Renderer backend failed to initialize.");
+    physics_backend_->Shutdown();
+    audio_backend_->Shutdown();
+    return 11;
+  }
+  logger.Info("Renderer backend initialized successfully.");
+
   logger.Info("Starting frame loop.");
 
   if (game_logic.IsLoaded()) {
@@ -248,7 +255,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 13 skeleton complete. Strict module mode enforcement wired.");
+  logger.Info("Phase 16 complete. DX11 device/swapchain clear-present path wired.");
 
   return 0;
 }

@@ -11,11 +11,18 @@ struct ClearColor {
   float alpha = 1.0f;
 };
 
+struct RendererInitInfo {
+  void* native_window_handle = nullptr;
+  int window_width = 1280;
+  int window_height = 720;
+  bool enable_vsync = true;
+};
+
 class IRendererBackend {
  public:
   virtual ~IRendererBackend() = default;
 
-  virtual bool Initialize() = 0;
+  virtual bool Initialize(const RendererInitInfo& init_info) = 0;
   virtual bool BeginFrame() = 0;
   virtual void Clear(const ClearColor& color) = 0;
   virtual void EndFrame() = 0;

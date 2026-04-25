@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 15 - Ship Candidate Automation
+## Current Phase: Phase 16 - DX11 Real Clear/Present Bootstrap
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -109,6 +109,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added automated export integrity checks for executable, modules, content, and config files.
 - [x] Added automated strict-mode runtime validation from exported game log.
 - [x] Added export profile hygiene checks ensuring only `config/engine.json` ships (no `engine.dev.json` / `engine.release.json`).
+- [x] Extended renderer interface with init context (`RendererInitInfo`) for native window bootstrap data.
+- [x] Extended platform window interface with native-handle access for backend integration.
+- [x] Reordered runtime startup so platform window is created before renderer initialization.
+- [x] Implemented real DirectX 11 renderer bootstrap in `RendererDX11` (device, swap chain, render-target view, clear, present).
+- [x] Added DX11 system library linkage (`d3d11`, `dxgi`) for renderer static/module targets.
 
 ## Not Started
 
@@ -209,7 +214,10 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Run `ship.bat` and confirm full one-command ship candidate flow succeeds.
 - [ ] Confirm `ship.bat` fails if any required module is missing from exported `bin/`.
 - [ ] Confirm `ship.bat` fails if strict-mode log checks do not show module runtime source for all modules.
-- [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
+- [ ] Build and run `CookieRuntime` and confirm the runtime window is no longer white (it should clear to `graphics.json` `clear_color` via DX11 each frame).
+- [ ] Confirm runtime startup still logs `Renderer runtime source` (`module` or `static-fallback`) correctly after DX11 bootstrap changes.
+- [ ] Confirm `MyGame.exe` in exported folder shows the same DX11 clear/present behavior and still honors strict module-mode rules.
+- [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
 
@@ -260,13 +268,15 @@ Status: completed (skeleton scope, pending local build verification)
 - Runtime now supports explicit engine config override via `--engine-config`.
 - Export now supports profile-based engine config materialization (`dev` or `release`) into exported `config/engine.json`.
 - `ship.bat` now provides a repeatable release-oriented ship candidate flow with integrated integrity + strict-mode validation checks.
+- Phase 16 now passes native window handle + size through API-neutral renderer init info instead of exposing backend types in core.
+- `RendererDX11` now owns real D3D11 frame presentation lifecycle (CreateDeviceAndSwapChain, RTV clear, Present).
 
 ## Best Next Step
 
-Begin integrating `ship.bat` into CI and adding artifact retention/report publishing for ship-candidate runs.
+Phase 17: add a minimal triangle pipeline in `RendererDX11` (shader compile/load, input layout, vertex buffer, draw call) while keeping runtime/editor/module boundaries unchanged.
 
 ## Suggested Commit Message
 
 ```text
-feat: add one-command release ship candidate automation
+feat: bootstrap real DX11 clear/present render path
 ```

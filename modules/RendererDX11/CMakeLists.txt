@@ -12,6 +12,14 @@ target_link_libraries(cookie_renderer_dx11
     cookie_renderer
 )
 
+if(WIN32)
+  target_link_libraries(cookie_renderer_dx11
+    PUBLIC
+      d3d11
+      dxgi
+  )
+endif()
+
 target_compile_features(cookie_renderer_dx11 PUBLIC cxx_std_20)
 
 add_library(cookie_renderer_dx11_module SHARED
@@ -28,6 +36,14 @@ target_link_libraries(cookie_renderer_dx11_module
   PUBLIC
     cookie_renderer
 )
+
+if(WIN32)
+  target_link_libraries(cookie_renderer_dx11_module
+    PUBLIC
+      d3d11
+      dxgi
+  )
+endif()
 
 target_compile_features(cookie_renderer_dx11_module PUBLIC cxx_std_20)
 

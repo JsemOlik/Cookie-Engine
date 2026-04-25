@@ -253,6 +253,12 @@ Add a release-oriented one-command build/export/validation flow that enforces st
 
 Milestone: a single script can rebuild in release mode, export with release profile, validate required modules/config/content, and run exported strict-mode startup checks.
 
+### [x] Phase 16: DX11 Real Clear/Present Bootstrap
+
+Replace the DX11 placeholder renderer behavior with a real D3D11 startup path (device, swap chain, render-target view) behind existing API-neutral renderer interfaces.
+
+Milestone: runtime window is cleared/presented by DX11 backend each frame, with no DirectX types leaked into core engine interfaces.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

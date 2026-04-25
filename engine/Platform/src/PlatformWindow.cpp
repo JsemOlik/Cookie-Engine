@@ -65,6 +65,10 @@ class Win32Window final : public IPlatformWindow {
     }
   }
 
+  void* GetNativeHandle() const override {
+    return handle_;
+  }
+
   void OnCloseMessage() {
     should_close_ = true;
   }
@@ -159,10 +163,26 @@ std::unique_ptr<IPlatformWindow> CreatePlatformWindow(
 
 namespace cookie::platform {
 
+namespace {
+
+class NullPlatformWindow final : public IPlatformWindow {
+ public:
+  void PollEvents() override {}
+  bool ShouldClose() const override {
+    return true;
+  }
+  void RequestClose() override {}
+  void* GetNativeHandle() const override {
+    return nullptr;
+  }
+};
+
+} // namespace
+
 std::unique_ptr<IPlatformWindow> CreatePlatformWindow(
     const WindowCreateInfo& create_info) {
   (void)create_info;
-  return nullptr;
+  return std::make_unique<NullPlatformWindow>();
 }
 
 } // namespace cookie::platform

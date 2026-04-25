@@ -18,6 +18,7 @@ class IPlatformWindow {
   virtual void PollEvents() = 0;
   virtual bool ShouldClose() const = 0;
   virtual void RequestClose() = 0;
+  virtual void* GetNativeHandle() const = 0;
 };
 
 std::unique_ptr<IPlatformWindow> CreatePlatformWindow(

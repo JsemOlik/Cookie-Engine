@@ -131,8 +131,8 @@ class DynamicRendererProxy final : public cookie::renderer::IRendererBackend {
     }
   }
 
-  bool Initialize() override {
-    return backend_ && backend_->Initialize();
+  bool Initialize(const cookie::renderer::RendererInitInfo& init_info) override {
+    return backend_ && backend_->Initialize(init_info);
   }
 
   bool BeginFrame() override {
