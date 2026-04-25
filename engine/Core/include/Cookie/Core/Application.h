@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "Cookie/Core/PhysicsBackend.h"
 #include "Cookie/Renderer/RendererBackend.h"
 
 namespace cookie::core {
@@ -20,12 +21,14 @@ struct ApplicationConfig {
 class Application {
  public:
   Application(ApplicationConfig config,
+              std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend,
               std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend);
 
   int Run() const;
 
  private:
   ApplicationConfig config_;
+  std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend_;
   std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend_;
 };
 

@@ -2,5 +2,7 @@
   "name": "cookie-engine",
   "version-string": "0.1.0",
   "description": "A modular C++ 3D game engine with a DirectX 11-first renderer architecture.",
-  "dependencies": []
+  "dependencies": [
+    "joltphysics"
+  ]
 }

@@ -14,8 +14,11 @@ namespace cookie::core {
 
 Application::Application(
     ApplicationConfig config,
+    std::unique_ptr<cookie::core::IPhysicsBackend> physics_backend,
     std::unique_ptr<cookie::renderer::IRendererBackend> renderer_backend)
-    : config_(std::move(config)), renderer_backend_(std::move(renderer_backend)) {}
+    : config_(std::move(config)),
+      physics_backend_(std::move(physics_backend)),
+      renderer_backend_(std::move(renderer_backend)) {}
 
 int Application::Run() const {
   const StartupPaths paths = DiscoverStartupPaths();
@@ -53,12 +56,24 @@ int Application::Run() const {
     logger.Error("No renderer backend instance is available.");
     return 2;
   }
+  if (!physics_backend_) {
+    logger.Error("No physics backend instance is available.");
+    return 3;
+  }
+
+  logger.Info("Initializing physics backend.");
+  if (!physics_backend_->Initialize()) {
+    logger.Error("Physics backend failed to initialize.");
+    return 4;
+  }
+  logger.Info("Physics backend initialized successfully.");
 
   logger.Info("Initializing renderer backend: " +
               std::string(renderer_backend_->Name()));
   if (!renderer_backend_->Initialize()) {
     logger.Error("Renderer backend failed to initialize.");
-    return 3;
+    physics_backend_->Shutdown();
+    return 5;
   }
   logger.Info("Renderer backend initialized successfully.");
 
@@ -70,7 +85,8 @@ int Application::Run() const {
   if (!window) {
     logger.Error("Platform window creation failed.");
     renderer_backend_->Shutdown();
-    return 4;
+    physics_backend_->Shutdown();
+    return 6;
   }
 
   logger.Info("Platform window created successfully.");
@@ -90,6 +106,15 @@ int Application::Run() const {
     renderer_backend_->EndFrame();
 
     ++frame_count;
+    const cookie::core::PhysicsStepStats step_stats =
+        physics_backend_->StepSimulation({
+            .delta_time_seconds = 1.0f / 60.0f,
+        });
+    if (frame_count == 1) {
+      logger.Info("Physics backend using Jolt headers: " +
+                  std::string(step_stats.using_jolt_headers ? "true" : "false"));
+    }
+
     if (config_.max_frames > 0 && frame_count >= config_.max_frames) {
       logger.Info("Frame loop reached max_frames, requesting shutdown.");
       window->RequestClose();
@@ -101,7 +126,9 @@ int Application::Run() const {
   logger.Info("Frame loop ended after " + std::to_string(frame_count) + " frames.");
   renderer_backend_->Shutdown();
   logger.Info("Renderer backend shut down successfully.");
-  logger.Info("Phase 4 skeleton complete. Asset mount/list contracts wired.");
+  physics_backend_->Shutdown();
+  logger.Info("Physics backend shut down successfully.");
+  logger.Info("Phase 5 skeleton complete. Physics contracts wired.");
 
   return 0;
 }

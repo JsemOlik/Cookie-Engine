@@ -5,6 +5,7 @@ add_executable(CookieRuntime
 target_link_libraries(CookieRuntime
   PRIVATE
     cookie_core
+    cookie_physics
     cookie_renderer
     cookie_renderer_dx11
 )

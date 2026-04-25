@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 4 - Asset Package Mount/List Skeleton
+## Current Phase: Phase 5 - Physics Module Skeleton
 
 Status: completed (skeleton scope)
 
@@ -38,6 +38,11 @@ Status: completed (skeleton scope)
 - [x] Added runtime asset package mount attempt for `content/base.pak` with log output.
 - [x] Added `CookiePakTool` CLI under `tools/` for quick package inspection.
 - [x] Added sample `content/base.pak` package manifest.
+- [x] Added physics backend interface in core (`IPhysicsBackend`).
+- [x] Added `modules/Physics` with `CreateJoltPhysicsBackend()` factory and simulation step skeleton.
+- [x] Added compile-time Jolt header detection (`__has_include(<Jolt/Jolt.h>)`) in physics backend.
+- [x] Wired runtime to initialize physics, run simulation steps in frame loop, and shut physics down.
+- [x] Added `joltphysics` dependency to `vcpkg.json` for this phase.
 
 ## Not Started
 
@@ -47,7 +52,7 @@ Status: completed (skeleton scope)
 - [x] DirectX 11 renderer module skeleton.
 - [x] Platform window abstraction skeleton.
 - [x] Runtime frame loop skeleton.
-- [ ] Jolt physics integration.
+- [x] Jolt physics integration (skeleton boundary + header detection).
 - [x] Asset package format and `.pak` tooling (skeleton text format).
 - [ ] Game logic module loading.
 - [ ] Exported game packaging.
@@ -73,6 +78,11 @@ Status: completed (skeleton scope)
 - [ ] Confirm `cmake --build out/build/x64-debug` succeeds after the Unicode Win32 API fix.
 - [ ] Confirm runtime log includes asset mount lines for `content/base.pak` and discovered asset count.
 - [ ] Build and run `CookiePakTool` against `content/base.pak` and confirm listed asset IDs.
+- [ ] Confirm runtime log includes:
+  - `Initializing physics backend.`
+  - `Physics backend initialized successfully.`
+  - `Physics backend using Jolt headers: true` (expected when vcpkg include paths are active)
+  - `Physics backend shut down successfully.`
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -91,13 +101,15 @@ Status: completed (skeleton scope)
 - Follow-up fix: switched cursor id to `MAKEINTRESOURCEW(32512)` for `LoadCursorW` compatibility across SDK setups.
 - Phase 4 introduces a temporary text `.pak` skeleton for asset mount/list flow only.
 - Runtime now attempts to mount `content/base.pak` and logs package/asset counts.
+- Phase 5 keeps physics API-neutral at core level and isolates backend implementation in `modules/Physics`.
+- Current physics step is deterministic skeleton logic, not full rigid-body simulation yet.
 
 ## Best Next Step
 
-Start Phase 5 by integrating Jolt Physics as a separate module boundary through API-neutral core interfaces.
+Start Phase 6 by scaffolding the Qt Widgets Cookie Editor shell and basic panel layout placeholders.
 
 ## Suggested Commit Message
 
 ```text
-feat: add asset package mount and listing skeleton
+feat: add physics module skeleton with jolt dependency
 ```

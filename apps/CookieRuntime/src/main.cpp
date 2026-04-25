@@ -2,6 +2,7 @@
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Renderer/RendererBackend.h"
 #include "Cookie/Renderer/RendererConfig.h"
+#include "Cookie/Physics/JoltPhysicsBackend.h"
 #include "Cookie/RendererDX11/RendererDX11Backend.h"
 
 #include <memory>
@@ -25,6 +26,7 @@ int main() {
   const cookie::renderer::RendererConfig renderer_config =
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
   auto backend = CreateRendererBackend(renderer_config.backend_name);
+  auto physics_backend = cookie::physics::CreateJoltPhysicsBackend();
 
   cookie::core::Application app({
       .application_name = "CookieRuntime",
@@ -34,7 +36,7 @@ int main() {
       .window_height = renderer_config.window_height,
       .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
-  }, std::move(backend));
+  }, std::move(physics_backend), std::move(backend));
 
   return app.Run();
 }
