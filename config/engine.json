@@ -1,4 +1,8 @@
 {
   "runtime": "CookieRuntime",
-  "log_file": "logs/latest.log"
+  "log_file": "logs/latest.log",
+  "renderer_dx11_module": "bin/RendererDX11.dll",
+  "physics_module": "bin/Physics.dll",
+  "audio_module": "bin/Audio.dll",
+  "core_module": "bin/Core.dll"
 }

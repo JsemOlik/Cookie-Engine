@@ -52,6 +52,30 @@ void CopyDirectoryContents(
   }
 }
 
+void CopyDirectoryDlls(
+    const fs::path& source_dir, const fs::path& destination_dir,
+    ExportResult& result) {
+  if (!fs::exists(source_dir) || !fs::is_directory(source_dir)) {
+    result.warnings.push_back("Missing directory: " + source_dir.string());
+    return;
+  }
+
+  fs::create_directories(destination_dir);
+  for (const auto& entry : fs::directory_iterator(source_dir)) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+
+    const fs::path source = entry.path();
+    if (source.extension() != ".dll") {
+      continue;
+    }
+
+    const fs::path destination = destination_dir / source.filename();
+    fs::copy_file(source, destination, fs::copy_options::overwrite_existing);
+  }
+}
+
 void WriteExportReport(
     const fs::path& report_path, const std::string& game_name,
     const ExportResult& result) {
@@ -66,7 +90,6 @@ void WriteExportReport(
 
   report << "Future module placeholders (expected in later phases):\n";
   report << " - Core.dll\n";
-  report << " - RendererDX11.dll\n";
   report << " - Physics.dll\n";
   report << " - Audio.dll\n\n";
 
@@ -115,6 +138,7 @@ int main(int argc, char** argv) {
 
     CopyFileIfExists(
         runtime_build_dir / "GameLogic.dll", export_bin / "GameLogic.dll", result);
+    CopyDirectoryDlls(runtime_build_dir / "bin", export_bin, result);
 
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);

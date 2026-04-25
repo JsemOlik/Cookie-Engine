@@ -211,6 +211,12 @@ Add export tooling for the structured game folder layout.
 
 Milestone: editor or tool exports a runnable game folder with executable, modules, content packages, configs, and logs folder.
 
+### [x] Phase 9: Runtime Module Loader Skeleton
+
+Add manifest-driven module path configuration and migrate the first runtime subsystem (renderer) toward a loadable DLL boundary with a safe fallback.
+
+Milestone: runtime can read renderer module path from `engine.json`, load `RendererDX11.dll` through exported factory symbols, and still fall back to static wiring if DLL loading fails.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

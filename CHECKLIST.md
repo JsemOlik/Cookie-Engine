@@ -1,8 +1,8 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 8 - Packaging And Export
+## Current Phase: Phase 9 - Runtime Module Loader (Renderer Slice)
 
-Status: completed (skeleton scope)
+Status: completed (skeleton scope, pending local build verification)
 
 ## Completed
 
@@ -72,6 +72,12 @@ Status: completed (skeleton scope)
 - [x] Added export report output (`export_report.txt`) documenting warnings and future module placeholders.
 - [x] Updated startup path resolution to prefer executable directory when it matches exported game layout.
 - [x] Added platform helper for executable directory lookup (`GetExecutableDirectory`).
+- [x] Added engine module-manifest fields in `config/engine.json` (`renderer_dx11_module`, `physics_module`, `audio_module`, `core_module`).
+- [x] Added `EngineConfig` loader in core (`LoadEngineConfig`).
+- [x] Added `RendererDX11` shared module target (`RendererDX11.dll`) with exported create/destroy backend symbols.
+- [x] Updated runtime bootstrap to try dynamic renderer module loading using engine config, with static DX11 fallback.
+- [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_renderer_dx11_module`.
+- [x] Updated export tool to copy module DLLs from runtime `bin/` to exported game `bin/`.
 
 ## Not Started
 
@@ -139,6 +145,9 @@ Status: completed (skeleton scope)
   - `<game-name>/logs/`
   - `<game-name>/export_report.txt`
 - [ ] Run exported `<game-name>.exe` from export root and confirm `logs/latest.log` is created under exported `<game-name>/logs/` (not repository root logs).
+- [ ] Build and run `CookieRuntime`, then confirm renderer still initializes when `RendererDX11.dll` is present in runtime `bin/`.
+- [ ] Temporarily rename runtime `bin/RendererDX11.dll` and confirm runtime still starts via static fallback path.
+- [ ] Run `CookieExportTool` and confirm exported `bin/RendererDX11.dll` exists.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -175,13 +184,16 @@ Status: completed (skeleton scope)
 - Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
 - Export currently reports future module placeholders (`Core.dll`, `RendererDX11.dll`, `Physics.dll`, `Audio.dll`) rather than producing those DLLs yet.
 - Runtime startup path detection now treats executable directory as project root when it contains exported `config/`, `content/`, and `logs/`.
+- Runtime now supports manifest-driven renderer module path in `engine.json`.
+- `modules/RendererDX11` now builds both static fallback library and shared module DLL for runtime loading transition.
+- Export tool now copies runtime module DLLs from `apps/CookieRuntime/bin` into exported `bin/`.
 
 ## Best Next Step
 
-Start next phase planning for runtime module packaging details (shared engine DLL targets), then iterate export tool integration with editor workflows.
+Migrate physics boundary from static link to manifest-driven DLL loading (`Physics.dll`) with the same load/fallback pattern used for renderer.
 
 ## Suggested Commit Message
 
 ```text
-fix: resolve exported runtime logs and config paths from executable directory
+feat: add manifest-driven renderer module loading skeleton
 ```
