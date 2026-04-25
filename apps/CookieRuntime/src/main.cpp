@@ -120,14 +120,14 @@ std::unique_ptr<cookie::renderer::IRendererBackend> CreateRendererBackend(
   if (backend_name == "dx11") {
     const auto from_project_root =
         ResolveModulePath(paths.project_root, engine_config.renderer_dx11_module);
-    if (const auto module_backend = TryCreateRendererFromModule(from_project_root)) {
+    if (auto module_backend = TryCreateRendererFromModule(from_project_root)) {
       return module_backend;
     }
 
     const auto from_runtime_dir = ResolveModulePath(
         cookie::platform::GetExecutableDirectory(),
         engine_config.renderer_dx11_module);
-    if (const auto module_backend = TryCreateRendererFromModule(from_runtime_dir)) {
+    if (auto module_backend = TryCreateRendererFromModule(from_runtime_dir)) {
       return module_backend;
     }
 
