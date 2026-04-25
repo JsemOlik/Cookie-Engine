@@ -178,12 +178,12 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Confirm runtime logs include `Audio runtime source: module` when `Audio.dll` is loaded.
 - [x] Confirm runtime logs include `Audio runtime source: static-fallback` when `Audio.dll` is unavailable.
 - [x] Run `CookieExportTool` and confirm exported `bin/Audio.dll` exists.
-- [ ] Build and run `CookieRuntime`, then confirm core probe resolves when `Core.dll` is present in runtime `bin/`.
-- [ ] Temporarily rename runtime `bin/Core.dll` and confirm runtime still starts via static fallback path.
-- [ ] Confirm runtime logs include `Core runtime source: module` when `Core.dll` is available.
-- [ ] Confirm runtime logs include `Core runtime source: static-fallback` when `Core.dll` is unavailable.
-- [ ] Confirm runtime logs include `Core module name: CookieCoreModule` and `Core module API version: 1` when module loads.
-- [ ] Run `CookieExportTool` and confirm exported `bin/Core.dll` exists.
+- [x] Build and run `CookieRuntime`, then confirm core probe resolves when `Core.dll` is present in runtime `bin/`.
+- [x] Temporarily rename runtime `bin/Core.dll` and confirm runtime still starts via static fallback path.
+- [x] Confirm runtime logs include `Core runtime source: module` when `Core.dll` is available.
+- [x] Confirm runtime logs include `Core runtime source: static-fallback` when `Core.dll` is unavailable.
+- [x] Confirm runtime logs include `Core module name: CookieCoreModule` and `Core module API version: 1` when module loads.
+- [x] Run `CookieExportTool` and confirm exported `bin/Core.dll` exists.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
