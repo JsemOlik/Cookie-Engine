@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 19 - Renderer Scene Builder Utilities
+## Current Phase: Phase 20 - Camera Projection Utilities
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -127,6 +127,10 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added renderer `SceneBuilder` utility for API-neutral scene assembly and stable `RenderScene` build output.
 - [x] Migrated runtime scene assembly from inline arrays/structs to renderer-side `SceneBuilder` + primitive/transform helpers.
 - [x] Updated runtime phase milestone log to Phase 19 completion text.
+- [x] Added renderer camera projection helpers (`MakeOrthographicProjection`, `MakePerspectiveProjection`) in transform utilities.
+- [x] Updated runtime scene camera to use renderer-provided orthographic projection.
+- [x] Updated runtime demo scene to render multiple world-space instances with independent transforms/animation.
+- [x] Updated runtime phase milestone log to Phase 20 completion text.
 
 ## Not Started
 
@@ -238,6 +242,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Confirm runtime and exported game logs now end with `Phase 18 complete. Engine-driven render scene contract wired.`.
 - [ ] Confirm runtime and exported game logs now end with `Phase 19 complete. Renderer scene-builder utilities wired.`.
 - [ ] Confirm removing or changing primitive/transform helper inputs in `engine/Renderer` affects runtime rendering without DX11 backend code changes.
+- [ ] Build and run `CookieRuntime` and confirm two triangle instances render with different scale/position and opposite rotation speeds.
+- [ ] Confirm runtime and exported game logs now end with `Phase 20 complete. Camera projection utilities wired.`.
+- [ ] Confirm world-space placement remains stable when window aspect changes (orthographic projection path active).
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -294,13 +301,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 17 now adds the first true draw pipeline in DX11 (shader compile, vertex layout, vertex buffer, triangle draw).
 - Phase 18 now routes render data through engine-owned scene contracts and submits per-frame camera/instance transforms to DX11.
 - Phase 19 now centralizes render scene composition in `engine/Renderer` utilities (`Transform`, `Primitives`, `SceneBuilder`) instead of runtime inline assembly.
+- Phase 20 now uses renderer-owned camera projection math for runtime scene submission and validates multi-instance world-space rendering.
 
 ## Best Next Step
 
-Phase 20: add a small renderer-facing camera/projection utility layer (orthographic + perspective builders), then use it to introduce a basic world-vs-screen-space example scene for runtime and editor viewport parity.
+Phase 21: add a dedicated camera helper module (view matrix + look-at + orbit controls skeleton) and expose camera settings through runtime config so demo scenes can switch between orthographic and perspective modes without code edits.
 
 ## Suggested Commit Message
 
 ```text
-feat: add renderer scene-builder utilities for runtime scene composition
+feat: add renderer camera projection utilities and multi-instance runtime scene
 ```

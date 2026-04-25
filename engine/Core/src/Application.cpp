@@ -205,6 +205,14 @@ int Application::Run() const {
   int frame_count = 0;
   cookie::renderer::SceneBuilder scene_builder;
   const auto triangle_vertices = cookie::renderer::MakeColoredTriangle();
+  const float aspect_ratio =
+      (config_.window_height > 0)
+          ? static_cast<float>(config_.window_width) /
+                static_cast<float>(config_.window_height)
+          : 1.0f;
+  const auto view_projection =
+      cookie::renderer::MakeOrthographicProjection(
+          2.8f * aspect_ratio, 2.8f, 0.0f, 1.0f);
   while (!window->ShouldClose()) {
     window->PollEvents();
 
@@ -215,16 +223,25 @@ int Application::Run() const {
     }
 
     renderer_backend_->Clear(config_.clear_color);
-    scene_builder.Reset(cookie::renderer::MakeIdentityTransform());
-    const auto model =
+    scene_builder.Reset(view_projection);
+    const auto left_triangle_model =
         cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(0.0f, 0.0f, 0.0f),
+            cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, 0.0f),
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeZRotationTransform(
                     static_cast<float>(frame_count) * 0.01f),
-                cookie::renderer::MakeScaleTransform(1.0f, 1.0f, 1.0f)));
+                cookie::renderer::MakeScaleTransform(0.8f, 0.8f, 1.0f)));
+    const auto right_triangle_model =
+        cookie::renderer::MultiplyTransforms(
+            cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.0f),
+            cookie::renderer::MultiplyTransforms(
+                cookie::renderer::MakeZRotationTransform(
+                    static_cast<float>(frame_count) * -0.015f),
+                cookie::renderer::MakeScaleTransform(0.5f, 0.5f, 1.0f)));
     scene_builder.AddMeshInstance(
-        triangle_vertices.data(), triangle_vertices.size(), model);
+        triangle_vertices.data(), triangle_vertices.size(), left_triangle_model);
+    scene_builder.AddMeshInstance(
+        triangle_vertices.data(), triangle_vertices.size(), right_triangle_model);
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
@@ -271,7 +288,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 19 complete. Renderer scene-builder utilities wired.");
+  logger.Info("Phase 20 complete. Camera projection utilities wired.");
 
   return 0;
 }

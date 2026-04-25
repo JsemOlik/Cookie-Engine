@@ -60,4 +60,38 @@ Float4x4 MultiplyTransforms(const Float4x4& a, const Float4x4& b) {
   return result;
 }
 
+Float4x4 MakeOrthographicProjection(float width, float height, float near_plane,
+                                    float far_plane) {
+  if (width == 0.0f || height == 0.0f || near_plane == far_plane) {
+    return MakeIdentityTransform();
+  }
+
+  Float4x4 matrix = MakeZeroMatrix();
+  matrix.m[0] = 2.0f / width;
+  matrix.m[5] = 2.0f / height;
+  matrix.m[10] = 1.0f / (far_plane - near_plane);
+  matrix.m[14] = near_plane / (near_plane - far_plane);
+  matrix.m[15] = 1.0f;
+  return matrix;
+}
+
+Float4x4 MakePerspectiveProjection(float fov_y_radians, float aspect_ratio,
+                                   float near_plane, float far_plane) {
+  if (aspect_ratio == 0.0f || near_plane <= 0.0f || near_plane == far_plane ||
+      fov_y_radians <= 0.0f) {
+    return MakeIdentityTransform();
+  }
+
+  const float y_scale = 1.0f / std::tan(fov_y_radians * 0.5f);
+  const float x_scale = y_scale / aspect_ratio;
+
+  Float4x4 matrix = MakeZeroMatrix();
+  matrix.m[0] = x_scale;
+  matrix.m[5] = y_scale;
+  matrix.m[10] = far_plane / (far_plane - near_plane);
+  matrix.m[11] = 1.0f;
+  matrix.m[14] = (-near_plane * far_plane) / (far_plane - near_plane);
+  return matrix;
+}
+
 } // namespace cookie::renderer

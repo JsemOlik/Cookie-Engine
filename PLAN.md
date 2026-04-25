@@ -277,6 +277,12 @@ Add reusable renderer-side utilities for scene composition (transform helpers, p
 
 Milestone: runtime triangle scene is built through `engine/Renderer` scene-builder APIs rather than inline hardcoded scene assembly in `Application`.
 
+### [x] Phase 20: Camera Projection Utilities
+
+Add reusable renderer-side camera/projection matrix helpers and use them in runtime scene submission to validate world-space layout through camera transforms.
+
+Milestone: runtime scene uses renderer projection utilities (orthographic camera) and renders multiple world-space instances with expected placement/animation.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.
