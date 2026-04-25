@@ -51,6 +51,7 @@ Status: completed (skeleton scope)
 - [x] Added CMake gating so CookieEditor target is skipped cleanly when Qt6 Widgets is unavailable.
 - [x] Added `builtin-baseline` to `vcpkg.json` for compatibility with newer manifest-mode vcpkg.
 - [x] Repinned `builtin-baseline` to a real public microsoft/vcpkg commit (`52f5569...`) after rejecting bundled-tool hash.
+- [x] Added root `build.bat` to clean and rebuild via vcpkg presets.
 
 ## Not Started
 
@@ -97,6 +98,7 @@ Status: completed (skeleton scope)
 - [ ] Configure/build with `x64-debug-vcpkg` and verify `CookieEditor` target is generated.
 - [ ] Run `CookieEditor` and confirm dock panels open:
   - `Hierarchy`, `Inspector`, `Asset Browser`, `Console`, `Game Viewport`
+- [ ] Run `build.bat` (default) and confirm it cleans previous outputs then configures/builds with `x64-debug-vcpkg`.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -120,6 +122,7 @@ Status: completed (skeleton scope)
 - If runtime shows `Physics backend using Jolt headers: false`, build likely used non-vcpkg preset/toolchain.
 - Phase 6 adds editor shell scaffolding only; no scene editing, serialization, or gameplay tooling yet.
 - If `cmake --preset x64-debug-vcpkg` fails with baseline error, ensure `builtin-baseline` remains pinned in `vcpkg.json`.
+- `build.bat` defaults to `x64-debug-vcpkg`; pass `x64-release-vcpkg` as argument for release builds.
 
 ## Best Next Step
 
@@ -128,5 +131,5 @@ Start Phase 7 by adding game logic module loading contract (`GameLogic.dll`-styl
 ## Suggested Commit Message
 
 ```text
-feat: scaffold qt widgets cookie editor shell
+chore: add vcpkg clean-build batch script
 ```
