@@ -121,6 +121,8 @@ echo [SUCCESS] Build completed for preset %PRESET%.
 echo [INFO] Build output: "%BUILD_DIR%"
 
 :end
-echo.
-set /p _COOKIE_ENGINE_CLOSE_PROMPT=Press Enter to close...
+if not defined COOKIE_ENGINE_NO_PAUSE (
+  echo.
+  set /p _COOKIE_ENGINE_CLOSE_PROMPT=Press Enter to close...
+)
 exit /b %EXIT_CODE%

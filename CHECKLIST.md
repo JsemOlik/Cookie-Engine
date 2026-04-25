@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 14 - Runtime Config Profiles
+## Current Phase: Phase 15 - Ship Candidate Automation
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -104,6 +104,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added runtime startup logging for engine config override path.
 - [x] Updated export tool to accept profile selection and apply chosen profile as exported `config/engine.json`.
 - [x] Updated export report to include selected engine profile.
+- [x] Added non-interactive mode for `build.bat` via `COOKIE_ENGINE_NO_PAUSE`.
+- [x] Added `ship.bat` one-command release build/export pipeline.
+- [x] Added automated export integrity checks for executable, modules, content, and config files.
+- [x] Added automated strict-mode runtime validation from exported game log.
+- [x] Added export profile hygiene checks ensuring only `config/engine.json` ships (no `engine.dev.json` / `engine.release.json`).
 
 ## Not Started
 
@@ -201,6 +206,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Run `CookieExportTool ... MyGame release` and confirm exported `config/engine.json` matches `engine.release.json`.
 - [ ] Run `CookieExportTool ... MyGame dev` and confirm exported `config/engine.json` matches `engine.dev.json`.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
+- [ ] Run `ship.bat` and confirm full one-command ship candidate flow succeeds.
+- [ ] Confirm `ship.bat` fails if any required module is missing from exported `bin/`.
+- [ ] Confirm `ship.bat` fails if strict-mode log checks do not show module runtime source for all modules.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -251,13 +259,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Runtime strict module mode is now configurable through `strict_module_mode` and per-module `require_*` flags in `engine.json`.
 - Runtime now supports explicit engine config override via `--engine-config`.
 - Export now supports profile-based engine config materialization (`dev` or `release`) into exported `config/engine.json`.
+- `ship.bat` now provides a repeatable release-oriented ship candidate flow with integrated integrity + strict-mode validation checks.
 
 ## Best Next Step
 
-Begin preparing CI presets and packaging commands that default to release profile export and strict module validation checks.
+Begin integrating `ship.bat` into CI and adding artifact retention/report publishing for ship-candidate runs.
 
 ## Suggested Commit Message
 
 ```text
-feat: add runtime engine config profile selection for dev and release
+feat: add one-command release ship candidate automation
 ```

@@ -247,6 +247,12 @@ Add explicit development and release engine config profiles, runtime argument-ba
 
 Milestone: runtime can load `--engine-config` overrides, and export tooling can produce a shipped `config/engine.json` from `engine.release.json` while preserving a dev-friendly profile in source configs.
 
+### [x] Phase 15: Ship Candidate Automation
+
+Add a release-oriented one-command build/export/validation flow that enforces strict module behavior and exported folder integrity.
+
+Milestone: a single script can rebuild in release mode, export with release profile, validate required modules/config/content, and run exported strict-mode startup checks.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.
