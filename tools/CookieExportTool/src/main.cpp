@@ -96,7 +96,7 @@ void WriteExportReport(
   report << "Status: " << (result.success ? "success" : "failed") << "\n\n";
 
   report << "Future module placeholders (expected in later phases):\n";
-  report << " - Core.dll\n";
+  report << " - (none currently)\n";
   report << "\n";
 
   if (!result.warnings.empty()) {
@@ -145,6 +145,9 @@ int main(int argc, char** argv) {
     CopyFileIfExists(
         runtime_build_dir / "GameLogic.dll", export_bin / "GameLogic.dll", result);
     CopyDirectoryDlls(runtime_build_dir / "bin", export_bin, result);
+    WarnIfMissing(
+        runtime_build_dir / "bin" / "Core.dll", result,
+        "Expected core module");
     WarnIfMissing(
         runtime_build_dir / "bin" / "RendererDX11.dll", result,
         "Expected renderer module");

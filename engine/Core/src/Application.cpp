@@ -34,6 +34,19 @@ int Application::Run() const {
 
   logger.Info("CookieRuntime startup sequence initialized.");
   logger.Info("Application: " + config_.application_name);
+  if (!config_.core_runtime_source.empty()) {
+    logger.Info("Core runtime source: " + config_.core_runtime_source);
+  }
+  if (!config_.core_module_path.empty()) {
+    logger.Info("Core module path: " + config_.core_module_path);
+  }
+  if (!config_.core_module_name.empty()) {
+    logger.Info("Core module name: " + config_.core_module_name);
+  }
+  if (config_.core_module_api_version > 0) {
+    logger.Info(
+        "Core module API version: " + std::to_string(config_.core_module_api_version));
+  }
   logger.Info("Selected renderer backend: " + config_.renderer_backend_name);
   if (!config_.renderer_runtime_source.empty()) {
     logger.Info("Renderer runtime source: " + config_.renderer_runtime_source);
@@ -204,7 +217,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 11 skeleton complete. Renderer, physics, and audio module loader contracts wired.");
+  logger.Info("Phase 12 skeleton complete. Core probe plus renderer, physics, and audio module loader contracts wired.");
 
   return 0;
 }

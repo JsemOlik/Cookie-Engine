@@ -229,6 +229,12 @@ Migrate audio runtime creation to the same manifest-driven DLL pattern as render
 
 Milestone: runtime can read audio module path from `engine.json`, load `Audio.dll` through exported factory symbols, and still fall back to static `CreateNullAudioBackend()` when DLL loading fails.
 
+### [x] Phase 12: Core Module Boundary Skeleton
+
+Add a `Core.dll` module artifact with exported identity/version symbols, and probe it from runtime startup using manifest-driven path resolution with static fallback logging.
+
+Milestone: runtime reports `Core runtime source` as `module` when `Core.dll` is available and falls back cleanly when unavailable, while preserving current static-link behavior.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 11 - Runtime Module Loader (Audio Slice)
+## Current Phase: Phase 12 - Core Module Boundary Skeleton
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -91,6 +91,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added explicit startup logs for audio runtime source (`module` vs `static-fallback`) and resolved module path.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_audio_module`.
 - [x] Updated export tool to warn when `Audio.dll` is missing at export source.
+- [x] Added `Core` shared module target (`Core.dll`) with exported identity/version symbols.
+- [x] Updated runtime startup to probe/load `Core.dll` identity symbols using manifest-driven path resolution.
+- [x] Added explicit startup logs for core runtime source (`module` vs `static-fallback`), module path, module name, and API version.
+- [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_core_module`.
+- [x] Updated export tool to warn when `Core.dll` is missing at export source.
 
 ## Not Started
 
@@ -173,6 +178,12 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Confirm runtime logs include `Audio runtime source: module` when `Audio.dll` is loaded.
 - [x] Confirm runtime logs include `Audio runtime source: static-fallback` when `Audio.dll` is unavailable.
 - [x] Run `CookieExportTool` and confirm exported `bin/Audio.dll` exists.
+- [ ] Build and run `CookieRuntime`, then confirm core probe resolves when `Core.dll` is present in runtime `bin/`.
+- [ ] Temporarily rename runtime `bin/Core.dll` and confirm runtime still starts via static fallback path.
+- [ ] Confirm runtime logs include `Core runtime source: module` when `Core.dll` is available.
+- [ ] Confirm runtime logs include `Core runtime source: static-fallback` when `Core.dll` is unavailable.
+- [ ] Confirm runtime logs include `Core module name: CookieCoreModule` and `Core module API version: 1` when module loads.
+- [ ] Run `CookieExportTool` and confirm exported `bin/Core.dll` exists.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -208,7 +219,7 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 7 adds dynamic game module loading shape without introducing scripting/runtime reflection yet.
 - Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
 - Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
-- Export currently reports future module placeholders (`Core.dll`) rather than producing those DLLs yet.
+- Export currently reports future module placeholders as none for implemented module boundaries.
 - Runtime startup path detection now treats executable directory as project root when it contains exported `config/`, `content/`, and `logs/`.
 - Runtime now supports manifest-driven renderer module path in `engine.json`.
 - `modules/RendererDX11` now builds both static fallback library and shared module DLL for runtime loading transition.
@@ -219,13 +230,15 @@ Status: completed (skeleton scope, pending local build verification)
 - Runtime now supports manifest-driven audio module path in `engine.json`.
 - Audio module loading and fallback were validated in local runtime logs (`module` with DLL present, `static-fallback` after rename).
 - Exported `MyGame.exe` was validated with `RendererDX11.dll`, `Physics.dll`, and `Audio.dll` all loading from exported `bin/`.
+- `engine/Core` now also builds `Core.dll` as a module artifact with exported identity/version symbols.
+- Runtime now probes the configured `core_module` path and logs core module metadata on success.
 
 ## Best Next Step
 
-Start preparing core/runtime DLL boundaries (`Core.dll`) and reduce static fallback usage as module loading stabilizes.
+Start planning reduction of static fallback paths and begin transitioning selected subsystems to strict module-required mode behind config flags.
 
 ## Suggested Commit Message
 
 ```text
-feat: add manifest-driven audio module loading skeleton
+feat: add core module boundary probe and export skeleton
 ```

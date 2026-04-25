@@ -23,7 +23,11 @@ using AudioCreateFn = cookie::core::IAudioBackend* (*)();
 using AudioDestroyFn = void (*)(cookie::core::IAudioBackend*);
 using PhysicsCreateFn = cookie::core::IPhysicsBackend* (*)();
 using PhysicsDestroyFn = void (*)(cookie::core::IPhysicsBackend*);
+using CoreModuleVersionFn = int (*)();
+using CoreModuleNameFn = const char* (*)();
 
+constexpr const char* kCoreVersionSymbol = "CookieCoreModuleApiVersion";
+constexpr const char* kCoreNameSymbol = "CookieCoreModuleName";
 constexpr const char* kCreateRendererSymbol = "CookieCreateRendererBackend";
 constexpr const char* kDestroyRendererSymbol = "CookieDestroyRendererBackend";
 constexpr const char* kCreateAudioSymbol = "CookieCreateAudioBackend";
@@ -47,6 +51,13 @@ struct AudioBootstrapResult {
   std::unique_ptr<cookie::core::IAudioBackend> backend;
   std::string runtime_source;
   std::string module_path;
+};
+
+struct CoreBootstrapResult {
+  std::string runtime_source;
+  std::string module_path;
+  std::string module_name;
+  int module_api_version = 0;
 };
 
 std::filesystem::path ResolveModulePath(
@@ -365,12 +376,59 @@ AudioBootstrapResult CreateAudioBackend(
   };
 }
 
+CoreBootstrapResult ProbeCoreModule(
+    const cookie::core::EngineConfig& engine_config,
+    const cookie::core::StartupPaths& paths) {
+  const auto probe = [&](const std::filesystem::path& module_path) -> CoreBootstrapResult {
+    const auto module = cookie::platform::LoadDynamicLibrary(module_path);
+    if (!module) {
+      return {};
+    }
+
+    const auto version_fn = reinterpret_cast<CoreModuleVersionFn>(
+        cookie::platform::GetLibrarySymbol(module, kCoreVersionSymbol));
+    const auto name_fn = reinterpret_cast<CoreModuleNameFn>(
+        cookie::platform::GetLibrarySymbol(module, kCoreNameSymbol));
+    if (!version_fn || !name_fn) {
+      cookie::platform::UnloadDynamicLibrary(module);
+      return {};
+    }
+
+    const char* module_name = name_fn();
+    CoreBootstrapResult result{
+        .runtime_source = "module",
+        .module_path = module_path.string(),
+        .module_name = module_name ? module_name : "unknown",
+        .module_api_version = version_fn(),
+    };
+    cookie::platform::UnloadDynamicLibrary(module);
+    return result;
+  };
+
+  const auto from_project_root =
+      ResolveModulePath(paths.project_root, engine_config.core_module);
+  if (auto result = probe(from_project_root); !result.runtime_source.empty()) {
+    return result;
+  }
+
+  const auto from_runtime_dir =
+      ResolveModulePath(cookie::platform::GetExecutableDirectory(), engine_config.core_module);
+  if (auto result = probe(from_runtime_dir); !result.runtime_source.empty()) {
+    return result;
+  }
+
+  return {
+      .runtime_source = "static-fallback",
+  };
+}
+
 } // namespace
 
 int main() {
   const cookie::core::StartupPaths paths = cookie::core::DiscoverStartupPaths();
   const cookie::core::EngineConfig engine_config =
       cookie::core::LoadEngineConfig(paths.engine_config);
+  const auto core_bootstrap = ProbeCoreModule(engine_config, paths);
   const cookie::renderer::RendererConfig renderer_config =
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
   auto renderer_bootstrap =
@@ -380,6 +438,10 @@ int main() {
 
   cookie::core::Application app({
       .application_name = engine_config.runtime_name,
+      .core_runtime_source = core_bootstrap.runtime_source,
+      .core_module_path = core_bootstrap.module_path,
+      .core_module_name = core_bootstrap.module_name,
+      .core_module_api_version = core_bootstrap.module_api_version,
       .renderer_backend_name = renderer_config.backend_name,
       .renderer_runtime_source = renderer_bootstrap.runtime_source,
       .renderer_module_path = renderer_bootstrap.module_path,

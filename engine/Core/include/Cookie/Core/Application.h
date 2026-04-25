@@ -11,6 +11,10 @@ namespace cookie::core {
 
 struct ApplicationConfig {
   std::string application_name;
+  std::string core_runtime_source;
+  std::string core_module_path;
+  std::string core_module_name;
+  int core_module_api_version = 0;
   std::string renderer_backend_name;
   std::string renderer_runtime_source;
   std::string renderer_module_path;
