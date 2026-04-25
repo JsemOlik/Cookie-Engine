@@ -99,6 +99,39 @@ int ExtractIntegerValue(const std::string& source, std::string key_name) {
   }
 }
 
+float ExtractFloatValue(const std::string& source, std::string key_name) {
+  const std::string key = "\"" + std::move(key_name) + "\"";
+  const std::size_t key_position = source.find(key);
+  if (key_position == std::string::npos) {
+    return 0.0f;
+  }
+
+  const std::size_t colon_position = source.find(':', key_position + key.size());
+  if (colon_position == std::string::npos) {
+    return 0.0f;
+  }
+
+  const std::size_t number_start =
+      source.find_first_of("-0123456789.", colon_position + 1);
+  if (number_start == std::string::npos) {
+    return 0.0f;
+  }
+
+  const std::size_t number_end =
+      source.find_first_not_of("-0123456789.eE+", number_start);
+  const std::string value_text =
+      source.substr(number_start, number_end - number_start);
+  if (value_text.empty()) {
+    return 0.0f;
+  }
+
+  try {
+    return std::stof(value_text);
+  } catch (...) {
+    return 0.0f;
+  }
+}
+
 void TryExtractClearColor(const std::string& source, ClearColor& out_color) {
   const std::string key = "\"clear_color\"";
   const std::size_t key_position = source.find(key);
@@ -168,6 +201,31 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
   const int parsed_max_frames = ExtractIntegerValue(contents, "max_frames");
   if (parsed_max_frames >= 0) {
     config.max_frames = parsed_max_frames;
+  }
+
+  const std::string parsed_camera_mode =
+      ToLower(ExtractStringValue(contents, "camera_mode"));
+  if (parsed_camera_mode == "orthographic" || parsed_camera_mode == "perspective") {
+    config.camera_mode = parsed_camera_mode;
+  }
+
+  const float parsed_ortho_height =
+      ExtractFloatValue(contents, "camera_ortho_height");
+  if (parsed_ortho_height > 0.0f) {
+    config.camera_ortho_height = parsed_ortho_height;
+  }
+
+  const float parsed_perspective_fov =
+      ExtractFloatValue(contents, "camera_perspective_fov_degrees");
+  if (parsed_perspective_fov > 0.0f) {
+    config.camera_perspective_fov_degrees = parsed_perspective_fov;
+  }
+
+  const float parsed_near_plane = ExtractFloatValue(contents, "camera_near_plane");
+  const float parsed_far_plane = ExtractFloatValue(contents, "camera_far_plane");
+  if (parsed_far_plane != parsed_near_plane) {
+    config.camera_near_plane = parsed_near_plane;
+    config.camera_far_plane = parsed_far_plane;
   }
 
   TryExtractClearColor(contents, config.clear_color);

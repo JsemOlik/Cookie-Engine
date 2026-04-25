@@ -1,6 +1,7 @@
 #include "Cookie/Core/Application.h"
 
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <thread>
 #include <utility>
@@ -74,6 +75,12 @@ int Application::Run() const {
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
+  logger.Info("Camera mode: " + config_.camera_mode);
+  logger.Info("Camera ortho height: " + std::to_string(config_.camera_ortho_height));
+  logger.Info("Camera perspective FOV degrees: " +
+              std::to_string(config_.camera_perspective_fov_degrees));
+  logger.Info("Camera near/far: " + std::to_string(config_.camera_near_plane) + "/" +
+              std::to_string(config_.camera_far_plane));
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -210,9 +217,21 @@ int Application::Run() const {
           ? static_cast<float>(config_.window_width) /
                 static_cast<float>(config_.window_height)
           : 1.0f;
+  const bool use_perspective = config_.camera_mode == "perspective";
+  const float near_plane = config_.camera_near_plane;
+  const float far_plane = config_.camera_far_plane;
+  const float ortho_height =
+      (config_.camera_ortho_height > 0.0f) ? config_.camera_ortho_height : 2.8f;
+  const float perspective_fov_radians =
+      config_.camera_perspective_fov_degrees * (3.1415926535f / 180.0f);
+  const bool perspective_params_valid =
+      perspective_fov_radians > 0.0f && near_plane > 0.0f && far_plane != near_plane;
   const auto view_projection =
-      cookie::renderer::MakeOrthographicProjection(
-          2.8f * aspect_ratio, 2.8f, 0.0f, 1.0f);
+      (use_perspective && perspective_params_valid)
+          ? cookie::renderer::MakePerspectiveProjection(
+                perspective_fov_radians, aspect_ratio, near_plane, far_plane)
+          : cookie::renderer::MakeOrthographicProjection(
+                ortho_height * aspect_ratio, ortho_height, near_plane, far_plane);
   while (!window->ShouldClose()) {
     window->PollEvents();
 
@@ -288,7 +307,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 20 complete. Camera projection utilities wired.");
+  logger.Info("Phase 21 complete. Config-driven camera mode selection wired.");
 
   return 0;
 }

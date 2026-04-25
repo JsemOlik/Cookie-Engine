@@ -283,6 +283,12 @@ Add reusable renderer-side camera/projection matrix helpers and use them in runt
 
 Milestone: runtime scene uses renderer projection utilities (orthographic camera) and renders multiple world-space instances with expected placement/animation.
 
+### [x] Phase 21: Config-Driven Camera Mode Selection
+
+Expose camera mode/settings in `graphics.json` and propagate them through renderer config into runtime scene projection selection.
+
+Milestone: runtime can switch between orthographic and perspective projection via config only, without code edits.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

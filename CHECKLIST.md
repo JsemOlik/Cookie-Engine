@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 20 - Camera Projection Utilities
+## Current Phase: Phase 21 - Config-Driven Camera Mode Selection
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -131,6 +131,10 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Updated runtime scene camera to use renderer-provided orthographic projection.
 - [x] Updated runtime demo scene to render multiple world-space instances with independent transforms/animation.
 - [x] Updated runtime phase milestone log to Phase 20 completion text.
+- [x] Added camera configuration fields to `graphics.json` (`camera_mode`, ortho height, perspective FOV, near/far).
+- [x] Extended `RendererConfig` parsing to read camera mode/settings from config.
+- [x] Threaded camera settings through runtime `ApplicationConfig` and projection selection.
+- [x] Added runtime startup camera logs to confirm config-driven values in use.
 
 ## Not Started
 
@@ -245,6 +249,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm two triangle instances render with different scale/position and opposite rotation speeds.
 - [ ] Confirm runtime and exported game logs now end with `Phase 20 complete. Camera projection utilities wired.`.
 - [ ] Confirm world-space placement remains stable when window aspect changes (orthographic projection path active).
+- [ ] Set `camera_mode` to `orthographic` and confirm runtime uses orthographic projection with configured ortho height.
+- [ ] Set `camera_mode` to `perspective` with valid near/far/FOV and confirm runtime uses perspective projection without code changes.
+- [ ] Confirm runtime startup logs print camera mode/settings from `graphics.json`.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -302,13 +309,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 18 now routes render data through engine-owned scene contracts and submits per-frame camera/instance transforms to DX11.
 - Phase 19 now centralizes render scene composition in `engine/Renderer` utilities (`Transform`, `Primitives`, `SceneBuilder`) instead of runtime inline assembly.
 - Phase 20 now uses renderer-owned camera projection math for runtime scene submission and validates multi-instance world-space rendering.
+- Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
 
 ## Best Next Step
 
-Phase 21: add a dedicated camera helper module (view matrix + look-at + orbit controls skeleton) and expose camera settings through runtime config so demo scenes can switch between orthographic and perspective modes without code edits.
+Phase 22: add view-matrix camera helpers (`LookAt`) plus a tiny orbit-camera skeleton so runtime can validate dynamic camera movement independent of object transforms.
 
 ## Suggested Commit Message
 
 ```text
-feat: add renderer camera projection utilities and multi-instance runtime scene
+feat: add config-driven camera mode selection for runtime projection
 ```

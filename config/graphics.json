@@ -4,5 +4,10 @@
   "window_width": 1280,
   "window_height": 720,
   "max_frames": 300,
+  "camera_mode": "orthographic",
+  "camera_ortho_height": 2.8,
+  "camera_perspective_fov_degrees": 60.0,
+  "camera_near_plane": 0.0,
+  "camera_far_plane": 1.0,
   "clear_color": [0.1, 0.1, 0.2, 1.0]
 }
