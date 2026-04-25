@@ -1,6 +1,7 @@
 add_library(cookie_core STATIC
   src/Application.cpp
   src/ConfigPaths.cpp
+  src/GameLogicModule.cpp
   src/Logger.cpp
 )
 

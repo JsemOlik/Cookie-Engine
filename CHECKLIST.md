@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 6 - Cookie Editor Qt Widgets Skeleton
+## Current Phase: Phase 7 - Game Logic Module
 
 Status: completed (skeleton scope)
 
@@ -59,6 +59,11 @@ Status: completed (skeleton scope)
 - [x] Updated `build.bat` to wait for Enter before closing so build output remains visible.
 - [x] Updated `build.bat` to auto-detect Ninja (PATH or Visual Studio bundled) and pass `CMAKE_MAKE_PROGRAM`.
 - [x] Updated `build.bat` to auto-load Visual Studio `VsDevCmd` when `cl.exe` is missing.
+- [x] Added `engine/Platform` dynamic library abstraction (`PlatformLibrary`) for module loading.
+- [x] Added `engine/Core` game logic module contract loader (`GameLogicModule`).
+- [x] Added `game/GameLogic` shared library target with exported startup/update/shutdown functions.
+- [x] Wired runtime to attempt loading `GameLogic.dll` and call lifecycle hooks during frame loop.
+- [x] Updated runtime phase completion log to Phase 7 milestone text.
 
 ## Not Started
 
@@ -70,7 +75,7 @@ Status: completed (skeleton scope)
 - [x] Runtime frame loop skeleton.
 - [x] Jolt physics integration (skeleton boundary + header detection).
 - [x] Asset package format and `.pak` tooling (skeleton text format).
-- [ ] Game logic module loading.
+- [x] Game logic module loading.
 - [ ] Exported game packaging.
 - [ ] OpenGL backend.
 - [ ] Save support.
@@ -109,6 +114,13 @@ Status: completed (skeleton scope)
 - [ ] Confirm `CookieEditor.exe` launches directly without Qt platform plugin error after plugin copy step.
 - [ ] Confirm runtime log `Project root` points to repo root (not `C:\ce-build\...`) and `content/base.pak` mounts successfully.
 - [ ] Run `build.bat` (default) and confirm it cleans previous outputs then configures/builds with `x64-debug-vcpkg`.
+- [ ] Confirm runtime logs either:
+  - `Loaded game logic module: ...GameLogic.dll`, or
+  - `Game logic module not loaded. Looked in repo/bin and runtime directory.`
+- [ ] Confirm runtime logs include:
+  - `Game logic startup completed.`
+  - `Game logic shutdown completed.`
+  - `Phase 7 skeleton complete. Game logic module contract wired.`
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -140,13 +152,15 @@ Status: completed (skeleton scope)
 - `build.bat` now pauses with `Press Enter to close...` on both success and failure paths.
 - `build.bat` now injects `-DCMAKE_MAKE_PROGRAM=<ninja-path>` during configure to avoid `CMAKE_MAKE_PROGRAM is not set`.
 - `build.bat` now attempts to bootstrap MSVC environment automatically via `VsDevCmd.bat`.
+- Phase 7 adds dynamic game module loading shape without introducing scripting/runtime reflection yet.
+- Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
 
 ## Best Next Step
 
-Start Phase 7 by adding game logic module loading contract (`GameLogic.dll`-style boundary) without full gameplay scripting yet.
+Start Phase 8 by adding packaging/export skeleton for the structured game folder layout (no full packer pipeline yet).
 
 ## Suggested Commit Message
 
 ```text
-chore: add vcpkg clean-build batch script
+feat: add game logic module loading skeleton
 ```

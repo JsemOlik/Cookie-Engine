@@ -6,8 +6,10 @@
 #include <utility>
 
 #include "Cookie/Core/ConfigPaths.h"
+#include "Cookie/Core/GameLogicModule.h"
 #include "Cookie/Core/Logger.h"
 #include "Cookie/Assets/AssetRegistry.h"
+#include "Cookie/Platform/PlatformPaths.h"
 #include "Cookie/Platform/PlatformWindow.h"
 
 namespace cookie::core {
@@ -40,6 +42,18 @@ int Application::Run() const {
   logger.Info("Graphics config: " + paths.graphics_config.string());
   logger.Info("Input config: " + paths.input_config.string());
   logger.Info("Game config: " + paths.game_config.string());
+
+  GameLogicModule game_logic;
+  const auto game_logic_from_repo = paths.project_root / "bin" / "GameLogic.dll";
+  const auto game_logic_from_runtime =
+      cookie::platform::GetWorkingDirectory() / "GameLogic.dll";
+  if (game_logic.Load(game_logic_from_repo)) {
+    logger.Info("Loaded game logic module: " + game_logic_from_repo.string());
+  } else if (game_logic.Load(game_logic_from_runtime)) {
+    logger.Info("Loaded game logic module: " + game_logic_from_runtime.string());
+  } else {
+    logger.Info("Game logic module not loaded. Looked in repo/bin and runtime directory.");
+  }
 
   cookie::assets::AssetRegistry assets;
   const auto base_package = paths.project_root / "content" / "base.pak";
@@ -92,6 +106,14 @@ int Application::Run() const {
   logger.Info("Platform window created successfully.");
   logger.Info("Starting frame loop.");
 
+  if (game_logic.IsLoaded()) {
+    if (game_logic.Startup()) {
+      logger.Info("Game logic startup completed.");
+    } else {
+      logger.Error("Game logic startup reported failure.");
+    }
+  }
+
   int frame_count = 0;
   while (!window->ShouldClose()) {
     window->PollEvents();
@@ -110,6 +132,11 @@ int Application::Run() const {
         physics_backend_->StepSimulation({
             .delta_time_seconds = 1.0f / 60.0f,
         });
+
+    if (game_logic.IsLoaded()) {
+      game_logic.Update(1.0f / 60.0f);
+    }
+
     if (frame_count == 1) {
       const bool has_jolt = step_stats.using_jolt_headers;
       logger.Info("Physics backend using Jolt headers: " +
@@ -129,11 +156,16 @@ int Application::Run() const {
   }
 
   logger.Info("Frame loop ended after " + std::to_string(frame_count) + " frames.");
+  if (game_logic.IsLoaded()) {
+    game_logic.Shutdown();
+    game_logic.Unload();
+    logger.Info("Game logic shutdown completed.");
+  }
   renderer_backend_->Shutdown();
   logger.Info("Renderer backend shut down successfully.");
   physics_backend_->Shutdown();
   logger.Info("Physics backend shut down successfully.");
-  logger.Info("Phase 5 skeleton complete. Physics contracts wired.");
+  logger.Info("Phase 7 skeleton complete. Game logic module contract wired.");
 
   return 0;
 }

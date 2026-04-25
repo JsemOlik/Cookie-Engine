@@ -1,4 +1,5 @@
 add_library(cookie_platform STATIC
+  src/PlatformLibrary.cpp
   src/PlatformPaths.cpp
   src/PlatformWindow.cpp
 )

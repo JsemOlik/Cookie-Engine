@@ -157,60 +157,60 @@ Platform-specific code should live behind `engine/Platform` interfaces. Windows 
 
 ## Development Phases And Milestones
 
-### Phase 0: Repository Foundation
+### [x] Phase 0: Repository Foundation
 
 Create planning docs, checklist, vcpkg manifest, and the initial folder architecture. Remove the default hello-world CMake scaffold.
 
 Milestone: CMake configures, `vcpkg.json` is valid, and the repository structure is ready for real targets.
 
-### Phase 1: Core And Runtime Skeleton
+### [x] Phase 1: Core And Runtime Skeleton
 
 Add initial core interfaces, logging, config path discovery, platform abstractions, module loading shape, and a runtime executable skeleton.
 
 Milestone: `CookieRuntime` starts, writes a log, reads placeholder config paths, and exits cleanly.
 
-### Phase 2: Renderer Abstraction And DX11 Module Skeleton
+### [x] Phase 2: Renderer Abstraction And DX11 Module Skeleton
 
 Add API-neutral renderer interfaces and a DX11 renderer module skeleton without building full rendering features.
 
 Milestone: runtime/editor test harness can choose the DX11 backend by config and initialize/shutdown it cleanly on Windows.
 
-### Phase 3: Windowing And Basic Viewport Rendering
+### [x] Phase 3: Windowing And Basic Viewport Rendering
 
 Add platform window creation and a minimal DX11 render loop.
 
 Milestone: a window opens and clears to a color through the renderer interface.
 
-### Phase 4: Asset System And .pak Tooling
+### [x] Phase 4: Asset System And .pak Tooling
 
 Create the asset interfaces and first asset packer/mounter implementation.
 
 Milestone: runtime mounts a `.pak`, lists known assets, and loads a simple test asset.
 
-### Phase 5: Jolt Physics Module
+### [x] Phase 5: Jolt Physics Module
 
 Add Jolt through vcpkg and implement the first physics module boundary.
 
 Milestone: a simple simulation step runs through the physics abstraction.
 
-### Phase 6: Cookie Editor Skeleton
+### [x] Phase 6: Cookie Editor Skeleton
 
 Add Qt Widgets through vcpkg and create the editor shell.
 
 Milestone: editor opens with dockable viewport, hierarchy, inspector, asset browser, and log panels as placeholders.
 
-### Phase 7: Game Logic Module
+### [x] Phase 7: Game Logic Module
 
 Add a separate game-code module shape.
 
 Milestone: runtime loads `GameLogic.dll`, calls a defined startup/update/shutdown contract, and keeps assets in `.pak` files.
 
-### Phase 8: Packaging And Export
+### [ ] Phase 8: Packaging And Export
 
 Add export tooling for the structured game folder layout.
 
 Milestone: editor or tool exports a runnable game folder with executable, modules, content packages, configs, and logs folder.
 
-### Future Phases
+### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.
