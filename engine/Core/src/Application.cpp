@@ -111,8 +111,13 @@ int Application::Run() const {
             .delta_time_seconds = 1.0f / 60.0f,
         });
     if (frame_count == 1) {
+      const bool has_jolt = step_stats.using_jolt_headers;
       logger.Info("Physics backend using Jolt headers: " +
-                  std::string(step_stats.using_jolt_headers ? "true" : "false"));
+                  std::string(has_jolt ? "true" : "false"));
+      if (!has_jolt) {
+        logger.Info(
+            "Hint: configure/build with x64-debug-vcpkg preset to enable vcpkg Jolt integration.");
+      }
     }
 
     if (config_.max_frames > 0 && frame_count >= config_.max_frames) {

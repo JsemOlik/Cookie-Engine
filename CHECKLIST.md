@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 5 - Physics Module Skeleton
+## Current Phase: Phase 6 - Cookie Editor Qt Widgets Skeleton
 
 Status: completed (skeleton scope)
 
@@ -45,11 +45,16 @@ Status: completed (skeleton scope)
 - [x] Added `joltphysics` dependency to `vcpkg.json` for this phase.
 - [x] Added optional `x64-debug-vcpkg` and `x64-release-vcpkg` presets for manifest/toolchain builds.
 - [x] Added physics-side CMake auto-link for common Jolt package targets when available.
+- [x] Added runtime hint log when Jolt headers are not active.
+- [x] Added `apps/CookieEditor` Qt Widgets skeleton with scene viewport, game viewport, hierarchy, inspector, asset browser, and console placeholders.
+- [x] Added `qtbase` dependency to `vcpkg.json`.
+- [x] Added CMake gating so CookieEditor target is skipped cleanly when Qt6 Widgets is unavailable.
+- [x] Added `builtin-baseline` to `vcpkg.json` for compatibility with newer manifest-mode vcpkg.
 
 ## Not Started
 
 - [x] Runtime executable skeleton.
-- [ ] Cookie Editor Qt Widgets shell.
+- [x] Cookie Editor Qt Widgets shell.
 - [x] Renderer abstraction.
 - [x] DirectX 11 renderer module skeleton.
 - [x] Platform window abstraction skeleton.
@@ -85,6 +90,12 @@ Status: completed (skeleton scope)
   - `Physics backend initialized successfully.`
   - `Physics backend using Jolt headers: true` (expected when building with a vcpkg preset and Jolt target resolves)
   - `Physics backend shut down successfully.`
+- [ ] Confirm runtime log hint appears when Jolt is inactive:
+  - `Hint: configure/build with x64-debug-vcpkg preset to enable vcpkg Jolt integration.`
+- [ ] Configure/build with `x64-debug-vcpkg` and verify `Physics backend using Jolt headers: true`.
+- [ ] Configure/build with `x64-debug-vcpkg` and verify `CookieEditor` target is generated.
+- [ ] Run `CookieEditor` and confirm dock panels open:
+  - `Hierarchy`, `Inspector`, `Asset Browser`, `Console`, `Game Viewport`
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -106,13 +117,15 @@ Status: completed (skeleton scope)
 - Phase 5 keeps physics API-neutral at core level and isolates backend implementation in `modules/Physics`.
 - Current physics step is deterministic skeleton logic, not full rigid-body simulation yet.
 - If runtime shows `Physics backend using Jolt headers: false`, build likely used non-vcpkg preset/toolchain.
+- Phase 6 adds editor shell scaffolding only; no scene editing, serialization, or gameplay tooling yet.
+- If `cmake --preset x64-debug-vcpkg` fails with baseline error, ensure `builtin-baseline` remains pinned in `vcpkg.json`.
 
 ## Best Next Step
 
-Start Phase 6 by scaffolding the Qt Widgets Cookie Editor shell and basic panel layout placeholders.
+Start Phase 7 by adding game logic module loading contract (`GameLogic.dll`-style boundary) without full gameplay scripting yet.
 
 ## Suggested Commit Message
 
 ```text
-feat: add physics module skeleton with jolt dependency
+feat: scaffold qt widgets cookie editor shell
 ```
