@@ -50,6 +50,23 @@ void ApplyEngineProfile(
   }
 }
 
+void RemoveProfileConfigsFromExport(
+    const fs::path& export_config_dir, ExportResult& result) {
+  const fs::path dev_profile = export_config_dir / "engine.dev.json";
+  const fs::path release_profile = export_config_dir / "engine.release.json";
+
+  std::error_code error;
+  if (fs::exists(dev_profile) && !fs::remove(dev_profile, error)) {
+    result.warnings.push_back(
+        "Failed to remove exported profile file: " + dev_profile.string());
+  }
+  error.clear();
+  if (fs::exists(release_profile) && !fs::remove(release_profile, error)) {
+    result.warnings.push_back(
+        "Failed to remove exported profile file: " + release_profile.string());
+  }
+}
+
 bool CopyFileIfExists(
     const fs::path& source, const fs::path& destination,
     ExportResult& result) {
@@ -193,6 +210,7 @@ int main(int argc, char** argv) {
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);
     ApplyEngineProfile(project_root / "config", export_config, profile_name, result);
+    RemoveProfileConfigsFromExport(export_config, result);
 
     WriteExportReport(
         export_root / "export_report.txt", game_name, profile_name, result);
