@@ -70,6 +70,8 @@ Status: completed (skeleton scope)
 - [x] Added export copy behavior for runtime executable (`CookieRuntime.exe` to `<GameName>.exe`).
 - [x] Added export copy behavior for `GameLogic.dll` when present.
 - [x] Added export report output (`export_report.txt`) documenting warnings and future module placeholders.
+- [x] Updated startup path resolution to prefer executable directory when it matches exported game layout.
+- [x] Added platform helper for executable directory lookup (`GetExecutableDirectory`).
 
 ## Not Started
 
@@ -136,6 +138,7 @@ Status: completed (skeleton scope)
   - `<game-name>/config/` copied from project `config/`
   - `<game-name>/logs/`
   - `<game-name>/export_report.txt`
+- [ ] Run exported `<game-name>.exe` from export root and confirm `logs/latest.log` is created under exported `<game-name>/logs/` (not repository root logs).
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -171,6 +174,7 @@ Status: completed (skeleton scope)
 - Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
 - Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
 - Export currently reports future module placeholders (`Core.dll`, `RendererDX11.dll`, `Physics.dll`, `Audio.dll`) rather than producing those DLLs yet.
+- Runtime startup path detection now treats executable directory as project root when it contains exported `config/`, `content/`, and `logs/`.
 
 ## Best Next Step
 
@@ -179,5 +183,5 @@ Start next phase planning for runtime module packaging details (shared engine DL
 ## Suggested Commit Message
 
 ```text
-feat: add export tool skeleton for game folder packaging
+fix: resolve exported runtime logs and config paths from executable directory
 ```

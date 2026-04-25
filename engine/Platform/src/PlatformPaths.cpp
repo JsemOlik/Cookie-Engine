@@ -2,6 +2,11 @@
 
 #include <array>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #ifndef COOKIE_ENGINE_SOURCE_ROOT
 #define COOKIE_ENGINE_SOURCE_ROOT ""
 #endif
@@ -42,6 +47,20 @@ std::filesystem::path GetCompileTimeSourceRoot() {
 
 std::filesystem::path GetWorkingDirectory() {
   return std::filesystem::current_path();
+}
+
+std::filesystem::path GetExecutableDirectory() {
+#if defined(_WIN32)
+  std::array<wchar_t, 32768> buffer{};
+  const DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
+                                          static_cast<DWORD>(buffer.size()));
+  if (length == 0 || length >= buffer.size()) {
+    return {};
+  }
+  return std::filesystem::path(buffer.data(), buffer.data() + length).parent_path();
+#else
+  return {};
+#endif
 }
 
 std::filesystem::path GetProjectRoot() {
