@@ -53,6 +53,8 @@ Status: completed (skeleton scope)
 - [x] Repinned `builtin-baseline` to a real public microsoft/vcpkg commit (`52f5569...`) after rejecting bundled-tool hash.
 - [x] Added root `build.bat` to clean and rebuild via vcpkg presets.
 - [x] Shortened vcpkg preset build/install directories to avoid deep-path Qt build failures on Windows.
+- [x] Added compile-time source-root fallback so runtime resolves `config/` and `content/` correctly from short build directories.
+- [x] Added `windeployqt` post-build deployment for `CookieEditor` on Windows.
 
 ## Not Started
 
@@ -99,6 +101,8 @@ Status: completed (skeleton scope)
 - [ ] Configure/build with `x64-debug-vcpkg` and verify `CookieEditor` target is generated.
 - [ ] Run `CookieEditor` and confirm dock panels open:
   - `Hierarchy`, `Inspector`, `Asset Browser`, `Console`, `Game Viewport`
+- [ ] Confirm `CookieEditor.exe` launches directly without Qt platform plugin error.
+- [ ] Confirm runtime log `Project root` points to repo root (not `C:\ce-build\...`) and `content/base.pak` mounts successfully.
 - [ ] Run `build.bat` (default) and confirm it cleans previous outputs then configures/builds with `x64-debug-vcpkg`.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -125,6 +129,7 @@ Status: completed (skeleton scope)
 - If `cmake --preset x64-debug-vcpkg` fails with baseline error, ensure `builtin-baseline` remains pinned in `vcpkg.json`.
 - `build.bat` defaults to `x64-debug-vcpkg`; pass `x64-release-vcpkg` as argument for release builds.
 - vcpkg presets now use `C:\ce-build\...` and `C:\ce-install\...` for shorter Windows paths.
+- Runtime now uses compile-time repo root as first path-resolution candidate when working directory is outside source tree.
 
 ## Best Next Step
 

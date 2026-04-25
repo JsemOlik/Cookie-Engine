@@ -59,5 +59,5 @@ if errorlevel 1 (
 )
 
 echo [SUCCESS] Build completed for preset %PRESET%.
-echo [INFO] Build output: "%cd%\%BUILD_DIR%"
+echo [INFO] Build output: "%BUILD_DIR%"
 exit /b 0

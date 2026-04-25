@@ -8,6 +8,12 @@ target_include_directories(cookie_platform
     include
 )
 
+string(REPLACE "\\" "\\\\" COOKIE_ENGINE_SOURCE_ROOT_ESCAPED "${CMAKE_SOURCE_DIR}")
+target_compile_definitions(cookie_platform
+  PUBLIC
+    COOKIE_ENGINE_SOURCE_ROOT="${COOKIE_ENGINE_SOURCE_ROOT_ESCAPED}"
+)
+
 target_compile_features(cookie_platform PUBLIC cxx_std_20)
 
 if(WIN32)
