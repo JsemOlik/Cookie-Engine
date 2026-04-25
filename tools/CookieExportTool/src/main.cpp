@@ -35,6 +35,13 @@ bool CopyFileIfExists(
   return true;
 }
 
+void WarnIfMissing(const fs::path& source, ExportResult& result, const char* label) {
+  if (!fs::exists(source)) {
+    result.warnings.push_back(
+        std::string(label) + " missing: " + source.string());
+  }
+}
+
 void CopyDirectoryContents(
     const fs::path& source_dir, const fs::path& destination_dir,
     ExportResult& result) {
@@ -138,6 +145,12 @@ int main(int argc, char** argv) {
     CopyFileIfExists(
         runtime_build_dir / "GameLogic.dll", export_bin / "GameLogic.dll", result);
     CopyDirectoryDlls(runtime_build_dir / "bin", export_bin, result);
+    WarnIfMissing(
+        runtime_build_dir / "bin" / "RendererDX11.dll", result,
+        "Expected renderer module");
+    WarnIfMissing(
+        runtime_build_dir / "bin" / "Physics.dll", result,
+        "Expected physics module");
 
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);

@@ -83,6 +83,7 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Updated runtime bootstrap to try dynamic physics module loading using engine config, with static Jolt fallback.
 - [x] Added explicit startup logs for physics runtime source (`module` vs `static-fallback`) and resolved module path.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_physics_module`.
+- [x] Updated export tool to warn when expected module DLLs (`RendererDX11.dll`, `Physics.dll`) are missing at export source.
 
 ## Not Started
 
@@ -160,6 +161,7 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Confirm runtime logs include `Physics runtime source: module` when `Physics.dll` is loaded.
 - [ ] Confirm runtime logs include `Physics runtime source: static-fallback` when `Physics.dll` is unavailable.
 - [ ] Run `CookieExportTool` and confirm exported `bin/Physics.dll` exists.
+- [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
