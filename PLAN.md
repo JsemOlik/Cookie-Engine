@@ -241,6 +241,12 @@ Add config-driven strict mode controls that can require module loading for core,
 
 Milestone: runtime keeps fallback behavior by default, but can fail fast with clear log errors when required modules are unavailable.
 
+### [x] Phase 14: Runtime Config Profiles
+
+Add explicit development and release engine config profiles, runtime argument-based profile/config selection, and export-time profile application.
+
+Milestone: runtime can load `--engine-config` overrides, and export tooling can produce a shipped `config/engine.json` from `engine.release.json` while preserving a dev-friendly profile in source configs.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

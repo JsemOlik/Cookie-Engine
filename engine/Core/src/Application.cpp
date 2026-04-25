@@ -77,6 +77,10 @@ int Application::Run() const {
   logger.Info("Graphics config: " + paths.graphics_config.string());
   logger.Info("Input config: " + paths.input_config.string());
   logger.Info("Game config: " + paths.game_config.string());
+  if (!config_.engine_config_path.empty() &&
+      config_.engine_config_path != paths.engine_config.string()) {
+    logger.Info("Engine config override in use: " + config_.engine_config_path);
+  }
 
   if (config_.require_core_module &&
       config_.core_runtime_source != "module") {

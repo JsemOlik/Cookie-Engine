@@ -1,3 +1,4 @@
+#include <cctype>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -14,12 +15,39 @@ struct ExportResult {
   std::vector<std::string> warnings;
 };
 
+bool CopyFileIfExists(
+    const fs::path& source, const fs::path& destination,
+    ExportResult& result);
+
 void PrintUsage() {
   std::cout
       << "Usage: CookieExportTool <project-root> <runtime-build-dir> "
-         "<export-parent-dir> [game-name]\n"
+         "<export-parent-dir> [game-name] [profile]\n"
       << "Example: CookieExportTool . out/build/x64-debug/apps/CookieRuntime "
-         "out/export MyGame\n";
+         "out/export MyGame release\n";
+}
+
+std::string NormalizeProfileName(std::string value) {
+  for (char& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (value != "dev" && value != "release") {
+    return "release";
+  }
+  return value;
+}
+
+void ApplyEngineProfile(
+    const fs::path& source_config_dir, const fs::path& export_config_dir,
+    const std::string& profile_name, ExportResult& result) {
+  const fs::path profile_file =
+      source_config_dir / ("engine." + profile_name + ".json");
+  const fs::path export_engine = export_config_dir / "engine.json";
+  if (!CopyFileIfExists(profile_file, export_engine, result)) {
+    result.warnings.push_back(
+        "Failed to apply engine profile: " + profile_name +
+        " (falling back to copied config/engine.json if present)");
+  }
 }
 
 bool CopyFileIfExists(
@@ -85,6 +113,7 @@ void CopyDirectoryDlls(
 
 void WriteExportReport(
     const fs::path& report_path, const std::string& game_name,
+    const std::string& profile_name,
     const ExportResult& result) {
   std::ofstream report(report_path, std::ios::trunc);
   if (!report.is_open()) {
@@ -92,7 +121,8 @@ void WriteExportReport(
   }
 
   report << "Cookie Engine Export Report\n";
-  report << "Game: " << game_name << "\n\n";
+  report << "Game: " << game_name << "\n";
+  report << "Engine profile: " << profile_name << "\n\n";
   report << "Status: " << (result.success ? "success" : "failed") << "\n\n";
 
   report << "Future module placeholders (expected in later phases):\n";
@@ -119,6 +149,8 @@ int main(int argc, char** argv) {
   const fs::path runtime_build_dir = fs::absolute(argv[2]);
   const fs::path export_parent_dir = fs::absolute(argv[3]);
   const std::string game_name = argc >= 5 ? argv[4] : "MyGame";
+  const std::string profile_name =
+      argc >= 6 ? NormalizeProfileName(argv[5]) : "release";
 
   const fs::path export_root = export_parent_dir / game_name;
   const fs::path export_bin = export_root / "bin";
@@ -160,8 +192,10 @@ int main(int argc, char** argv) {
 
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);
+    ApplyEngineProfile(project_root / "config", export_config, profile_name, result);
 
-    WriteExportReport(export_root / "export_report.txt", game_name, result);
+    WriteExportReport(
+        export_root / "export_report.txt", game_name, profile_name, result);
   } catch (const std::exception& exception) {
     std::cout << "Export failed: " << exception.what() << '\n';
     return 2;

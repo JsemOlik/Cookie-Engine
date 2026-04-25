@@ -13,6 +13,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace {
@@ -76,6 +77,42 @@ std::filesystem::path ResolveModulePath(
 
 bool IsModuleRequired(const cookie::core::EngineConfig& config, bool specific_flag) {
   return config.strict_module_mode || specific_flag;
+}
+
+std::optional<std::filesystem::path> TryReadEngineConfigArg(
+    int argc, char** argv) {
+  for (int index = 1; index < argc; ++index) {
+    const std::string arg = argv[index];
+    if (arg == "--engine-config" && index + 1 < argc) {
+      return std::filesystem::path(argv[index + 1]);
+    }
+  }
+  return std::nullopt;
+}
+
+std::filesystem::path ResolveEngineConfigPath(
+    const cookie::core::StartupPaths& paths,
+    const std::optional<std::filesystem::path>& maybe_override) {
+  if (!maybe_override || maybe_override->empty()) {
+    return paths.engine_config;
+  }
+
+  if (maybe_override->is_absolute()) {
+    return *maybe_override;
+  }
+
+  const auto from_project_root = paths.project_root / *maybe_override;
+  if (std::filesystem::exists(from_project_root)) {
+    return from_project_root;
+  }
+
+  const auto from_executable_dir =
+      cookie::platform::GetExecutableDirectory() / *maybe_override;
+  if (std::filesystem::exists(from_executable_dir)) {
+    return from_executable_dir;
+  }
+
+  return std::filesystem::absolute(*maybe_override);
 }
 
 class DynamicRendererProxy final : public cookie::renderer::IRendererBackend {
@@ -428,10 +465,13 @@ CoreBootstrapResult ProbeCoreModule(
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
   const cookie::core::StartupPaths paths = cookie::core::DiscoverStartupPaths();
+  const auto engine_config_arg = TryReadEngineConfigArg(argc, argv);
+  const auto resolved_engine_config_path =
+      ResolveEngineConfigPath(paths, engine_config_arg);
   const cookie::core::EngineConfig engine_config =
-      cookie::core::LoadEngineConfig(paths.engine_config);
+      cookie::core::LoadEngineConfig(resolved_engine_config_path);
   const auto core_bootstrap = ProbeCoreModule(engine_config, paths);
   const cookie::renderer::RendererConfig renderer_config =
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
@@ -442,6 +482,7 @@ int main() {
 
   cookie::core::Application app({
       .application_name = engine_config.runtime_name,
+      .engine_config_path = resolved_engine_config_path.string(),
       .core_runtime_source = core_bootstrap.runtime_source,
       .core_module_path = core_bootstrap.module_path,
       .core_module_name = core_bootstrap.module_name,

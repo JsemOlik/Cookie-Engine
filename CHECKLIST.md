@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 13 - Optional Strict Module Mode
+## Current Phase: Phase 14 - Runtime Config Profiles
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -99,6 +99,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added strict module-mode config flags in `engine.json` and `EngineConfig` parser.
 - [x] Added runtime startup logging for strict module mode state.
 - [x] Added fail-fast enforcement for required module availability (core/renderer/physics/audio) with clear error logs.
+- [x] Added `config/engine.dev.json` and `config/engine.release.json` runtime profile files.
+- [x] Added runtime `--engine-config <path>` override support.
+- [x] Added runtime startup logging for engine config override path.
+- [x] Updated export tool to accept profile selection and apply chosen profile as exported `config/engine.json`.
+- [x] Updated export report to include selected engine profile.
 
 ## Not Started
 
@@ -190,6 +195,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Set `strict_module_mode=true`, remove one module DLL, and confirm runtime exits early with a clear required-module error.
 - [ ] Set `strict_module_mode=false` and `require_renderer_module=true`, remove `RendererDX11.dll`, and confirm runtime exits with renderer-required error.
 - [ ] Set all strict/require flags to false, remove one module DLL, and confirm runtime falls back and still runs.
+- [ ] Run `CookieRuntime --engine-config config/engine.release.json` and confirm `Strict module mode: true` in logs.
+- [ ] Run `CookieRuntime --engine-config config/engine.dev.json` and confirm `Strict module mode: false` in logs.
+- [ ] Run exported game with release profile and confirm strict module behavior matches release config.
+- [ ] Run `CookieExportTool ... MyGame release` and confirm exported `config/engine.json` matches `engine.release.json`.
+- [ ] Run `CookieExportTool ... MyGame dev` and confirm exported `config/engine.json` matches `engine.dev.json`.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -239,13 +249,15 @@ Status: completed (skeleton scope, pending local build verification)
 - `engine/Core` now also builds `Core.dll` as a module artifact with exported identity/version symbols.
 - Runtime now probes the configured `core_module` path and logs core module metadata on success.
 - Runtime strict module mode is now configurable through `strict_module_mode` and per-module `require_*` flags in `engine.json`.
+- Runtime now supports explicit engine config override via `--engine-config`.
+- Export now supports profile-based engine config materialization (`dev` or `release`) into exported `config/engine.json`.
 
 ## Best Next Step
 
-Begin introducing optional CI/release profile configs that enable strict module mode by default while keeping dev profile fallback-friendly.
+Begin preparing CI presets and packaging commands that default to release profile export and strict module validation checks.
 
 ## Suggested Commit Message
 
 ```text
-feat: add optional strict module mode enforcement
+feat: add runtime engine config profile selection for dev and release
 ```
