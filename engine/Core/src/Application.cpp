@@ -81,6 +81,12 @@ int Application::Run() const {
               std::to_string(config_.camera_perspective_fov_degrees));
   logger.Info("Camera near/far: " + std::to_string(config_.camera_near_plane) + "/" +
               std::to_string(config_.camera_far_plane));
+  logger.Info("Camera orbit enabled: " +
+              std::string(config_.camera_orbit_enabled ? "true" : "false"));
+  logger.Info("Camera orbit radius/height/speed: " +
+              std::to_string(config_.camera_orbit_radius) + "/" +
+              std::to_string(config_.camera_orbit_height) + "/" +
+              std::to_string(config_.camera_orbit_speed));
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -242,17 +248,30 @@ int Application::Run() const {
     }
 
     renderer_backend_->Clear(config_.clear_color);
-    scene_builder.Reset(view_projection);
+    const float orbit_angle = static_cast<float>(frame_count) *
+        (config_.camera_orbit_speed * (1.0f / 60.0f));
+    const float camera_x = config_.camera_orbit_enabled
+                               ? std::cos(orbit_angle) * config_.camera_orbit_radius
+                               : 0.0f;
+    const float camera_y = config_.camera_orbit_enabled
+                               ? config_.camera_orbit_height
+                               : 0.0f;
+    const float camera_z = config_.camera_orbit_enabled
+                               ? std::sin(orbit_angle) * config_.camera_orbit_radius
+                               : -config_.camera_orbit_radius;
+    const auto view = cookie::renderer::MakeLookAtView(
+        camera_x, camera_y, camera_z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    scene_builder.Reset(cookie::renderer::MultiplyTransforms(view, view_projection));
     const auto left_triangle_model =
         cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, 0.0f),
+            cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, -0.25f),
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeZRotationTransform(
                     static_cast<float>(frame_count) * 0.01f),
                 cookie::renderer::MakeScaleTransform(0.8f, 0.8f, 1.0f)));
     const auto right_triangle_model =
         cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.0f),
+            cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.35f),
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeZRotationTransform(
                     static_cast<float>(frame_count) * -0.015f),
@@ -307,7 +326,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 21 complete. Config-driven camera mode selection wired.");
+  logger.Info("Phase 22 complete. View matrix and orbit camera skeleton wired.");
 
   return 0;
 }

@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 21 - Config-Driven Camera Mode Selection
+## Current Phase: Phase 22 - View Matrix And Orbit Camera Skeleton
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -135,6 +135,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Extended `RendererConfig` parsing to read camera mode/settings from config.
 - [x] Threaded camera settings through runtime `ApplicationConfig` and projection selection.
 - [x] Added runtime startup camera logs to confirm config-driven values in use.
+- [x] Added renderer `MakeLookAtView(...)` helper for view matrix construction.
+- [x] Added config-driven orbit camera skeleton fields (enabled/radius/height/speed) in renderer/runtime config flow.
+- [x] Updated runtime scene submission to compose camera `view * projection` each frame.
+- [x] Added world-depth offsets in demo instances to better expose camera behavior.
+- [x] Updated runtime phase milestone log to Phase 22 completion text.
 
 ## Not Started
 
@@ -252,6 +257,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Set `camera_mode` to `orthographic` and confirm runtime uses orthographic projection with configured ortho height.
 - [ ] Set `camera_mode` to `perspective` with valid near/far/FOV and confirm runtime uses perspective projection without code changes.
 - [ ] Confirm runtime startup logs print camera mode/settings from `graphics.json`.
+- [ ] Toggle `camera_orbit_enabled` true/false and confirm camera motion starts/stops while scene still renders.
+- [ ] Adjust `camera_orbit_radius` and `camera_orbit_speed` in `graphics.json` and confirm visible camera path changes.
+- [ ] Confirm runtime and exported game logs now end with `Phase 22 complete. View matrix and orbit camera skeleton wired.`.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -310,13 +318,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 19 now centralizes render scene composition in `engine/Renderer` utilities (`Transform`, `Primitives`, `SceneBuilder`) instead of runtime inline assembly.
 - Phase 20 now uses renderer-owned camera projection math for runtime scene submission and validates multi-instance world-space rendering.
 - Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
+- Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
 
 ## Best Next Step
 
-Phase 22: add view-matrix camera helpers (`LookAt`) plus a tiny orbit-camera skeleton so runtime can validate dynamic camera movement independent of object transforms.
+Phase 23: start first true 3D object path by introducing indexed mesh support in renderer contracts and render a simple cube mesh with depth-friendly camera defaults.
 
 ## Suggested Commit Message
 
 ```text
-feat: add config-driven camera mode selection for runtime projection
+feat: add look-at view matrix and orbit camera skeleton
 ```

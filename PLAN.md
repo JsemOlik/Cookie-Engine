@@ -289,6 +289,12 @@ Expose camera mode/settings in `graphics.json` and propagate them through render
 
 Milestone: runtime can switch between orthographic and perspective projection via config only, without code edits.
 
+### [x] Phase 22: View Matrix And Orbit Camera Skeleton
+
+Add renderer-side view matrix helper (`LookAt`) and use it in runtime camera update flow with a simple orbit behavior around the scene target.
+
+Milestone: runtime composes `view * projection` from config-driven camera settings, supports orbit on/off, and validates camera motion independent of object transforms.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

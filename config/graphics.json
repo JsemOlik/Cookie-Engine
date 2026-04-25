@@ -7,7 +7,11 @@
   "camera_mode": "orthographic",
   "camera_ortho_height": 2.8,
   "camera_perspective_fov_degrees": 60.0,
-  "camera_near_plane": 0.0,
-  "camera_far_plane": 1.0,
+  "camera_near_plane": 0.1,
+  "camera_far_plane": 100.0,
+  "camera_orbit_enabled": true,
+  "camera_orbit_radius": 2.5,
+  "camera_orbit_height": 0.6,
+  "camera_orbit_speed": 0.7,
   "clear_color": [0.1, 0.1, 0.2, 1.0]
 }

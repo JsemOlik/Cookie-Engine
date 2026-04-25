@@ -99,6 +99,34 @@ int ExtractIntegerValue(const std::string& source, std::string key_name) {
   }
 }
 
+bool ExtractBoolValue(const std::string& source, std::string key_name,
+                      bool default_value) {
+  const std::string key = "\"" + std::move(key_name) + "\"";
+  const std::size_t key_position = source.find(key);
+  if (key_position == std::string::npos) {
+    return default_value;
+  }
+
+  const std::size_t colon_position = source.find(':', key_position + key.size());
+  if (colon_position == std::string::npos) {
+    return default_value;
+  }
+
+  const std::size_t value_start =
+      source.find_first_not_of(" \t\r\n", colon_position + 1);
+  if (value_start == std::string::npos) {
+    return default_value;
+  }
+
+  if (source.compare(value_start, 4, "true") == 0) {
+    return true;
+  }
+  if (source.compare(value_start, 5, "false") == 0) {
+    return false;
+  }
+  return default_value;
+}
+
 float ExtractFloatValue(const std::string& source, std::string key_name) {
   const std::string key = "\"" + std::move(key_name) + "\"";
   const std::size_t key_position = source.find(key);
@@ -226,6 +254,25 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
   if (parsed_far_plane != parsed_near_plane) {
     config.camera_near_plane = parsed_near_plane;
     config.camera_far_plane = parsed_far_plane;
+  }
+
+  config.camera_orbit_enabled =
+      ExtractBoolValue(contents, "camera_orbit_enabled", config.camera_orbit_enabled);
+
+  const float parsed_orbit_radius =
+      ExtractFloatValue(contents, "camera_orbit_radius");
+  if (parsed_orbit_radius > 0.0f) {
+    config.camera_orbit_radius = parsed_orbit_radius;
+  }
+
+  const float parsed_orbit_height =
+      ExtractFloatValue(contents, "camera_orbit_height");
+  config.camera_orbit_height = parsed_orbit_height;
+
+  const float parsed_orbit_speed =
+      ExtractFloatValue(contents, "camera_orbit_speed");
+  if (parsed_orbit_speed > 0.0f) {
+    config.camera_orbit_speed = parsed_orbit_speed;
   }
 
   TryExtractClearColor(contents, config.clear_color);

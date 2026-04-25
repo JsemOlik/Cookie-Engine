@@ -519,6 +519,10 @@ int main(int argc, char** argv) {
           renderer_config.camera_perspective_fov_degrees,
       .camera_near_plane = renderer_config.camera_near_plane,
       .camera_far_plane = renderer_config.camera_far_plane,
+      .camera_orbit_enabled = renderer_config.camera_orbit_enabled,
+      .camera_orbit_radius = renderer_config.camera_orbit_radius,
+      .camera_orbit_height = renderer_config.camera_orbit_height,
+      .camera_orbit_speed = renderer_config.camera_orbit_speed,
       .clear_color = renderer_config.clear_color,
   }, std::move(audio_bootstrap.backend), std::move(physics_bootstrap.backend),
      std::move(renderer_bootstrap.backend));
