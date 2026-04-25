@@ -113,6 +113,11 @@ class RendererDX11Backend final : public IRendererBackend {
       return false;
     }
 
+    if (!CreateDepthResources(width, height)) {
+      Shutdown();
+      return false;
+    }
+
     D3D11_VIEWPORT viewport{};
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
@@ -141,8 +146,9 @@ class RendererDX11Backend final : public IRendererBackend {
 
   bool BeginFrame() override {
 #if defined(_WIN32)
-    if (initialized_ && device_context_ != nullptr && render_target_view_ != nullptr) {
-      device_context_->OMSetRenderTargets(1, &render_target_view_, nullptr);
+    if (initialized_ && device_context_ != nullptr && render_target_view_ != nullptr &&
+        depth_stencil_view_ != nullptr) {
+      device_context_->OMSetRenderTargets(1, &render_target_view_, depth_stencil_view_);
     }
 #endif
     return initialized_;
@@ -155,6 +161,10 @@ class RendererDX11Backend final : public IRendererBackend {
     }
     const float clear_color[] = {color.red, color.green, color.blue, color.alpha};
     device_context_->ClearRenderTargetView(render_target_view_, clear_color);
+    if (depth_stencil_view_ != nullptr) {
+      device_context_->ClearDepthStencilView(
+          depth_stencil_view_, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    }
 #else
     (void)color;
 #endif
@@ -182,6 +192,11 @@ class RendererDX11Backend final : public IRendererBackend {
   void Shutdown() override {
 #if defined(_WIN32)
     submitted_scene_ = {};
+    if (index_buffer_ != nullptr) {
+      index_buffer_->Release();
+      index_buffer_ = nullptr;
+    }
+    index_buffer_capacity_bytes_ = 0;
     if (vertex_buffer_ != nullptr) {
       vertex_buffer_->Release();
       vertex_buffer_ = nullptr;
@@ -206,6 +221,14 @@ class RendererDX11Backend final : public IRendererBackend {
     if (render_target_view_ != nullptr) {
       render_target_view_->Release();
       render_target_view_ = nullptr;
+    }
+    if (depth_stencil_view_ != nullptr) {
+      depth_stencil_view_->Release();
+      depth_stencil_view_ = nullptr;
+    }
+    if (depth_stencil_buffer_ != nullptr) {
+      depth_stencil_buffer_->Release();
+      depth_stencil_buffer_ = nullptr;
     }
     if (swap_chain_ != nullptr) {
       swap_chain_->Release();
@@ -363,6 +386,35 @@ float4 PSMain(PSIn input) : SV_Target {
     return true;
   }
 
+  bool CreateDepthResources(UINT width, UINT height) {
+    if (device_ == nullptr || width == 0 || height == 0) {
+      return false;
+    }
+
+    D3D11_TEXTURE2D_DESC depth_desc{};
+    depth_desc.Width = width;
+    depth_desc.Height = height;
+    depth_desc.MipLevels = 1;
+    depth_desc.ArraySize = 1;
+    depth_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depth_desc.SampleDesc.Count = 1;
+    depth_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+    const HRESULT depth_buffer_result =
+        device_->CreateTexture2D(&depth_desc, nullptr, &depth_stencil_buffer_);
+    if (FAILED(depth_buffer_result) || depth_stencil_buffer_ == nullptr) {
+      return false;
+    }
+
+    const HRESULT depth_view_result = device_->CreateDepthStencilView(
+        depth_stencil_buffer_, nullptr, &depth_stencil_view_);
+    if (FAILED(depth_view_result) || depth_stencil_view_ == nullptr) {
+      return false;
+    }
+
+    return true;
+  }
+
   bool EnsureVertexBufferCapacity(std::size_t required_bytes) {
     if (required_bytes == 0 || required_bytes > static_cast<std::size_t>(UINT_MAX)) {
       return false;
@@ -390,6 +442,36 @@ float4 PSMain(PSIn input) : SV_Target {
     }
 
     vertex_buffer_capacity_bytes_ = required_bytes;
+    return true;
+  }
+
+  bool EnsureIndexBufferCapacity(std::size_t required_bytes) {
+    if (required_bytes == 0 || required_bytes > static_cast<std::size_t>(UINT_MAX)) {
+      return false;
+    }
+    if (index_buffer_ != nullptr && required_bytes <= index_buffer_capacity_bytes_) {
+      return true;
+    }
+
+    if (index_buffer_ != nullptr) {
+      index_buffer_->Release();
+      index_buffer_ = nullptr;
+      index_buffer_capacity_bytes_ = 0;
+    }
+
+    D3D11_BUFFER_DESC index_buffer_desc{};
+    index_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+    index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    index_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    index_buffer_desc.ByteWidth = static_cast<UINT>(required_bytes);
+
+    const HRESULT result =
+        device_->CreateBuffer(&index_buffer_desc, nullptr, &index_buffer_);
+    if (FAILED(result) || index_buffer_ == nullptr) {
+      return false;
+    }
+
+    index_buffer_capacity_bytes_ = required_bytes;
     return true;
   }
 
@@ -432,6 +514,26 @@ float4 PSMain(PSIn input) : SV_Target {
     std::memcpy(mapped_vertex_buffer.pData, instance.vertices, required_bytes);
     device_context_->Unmap(vertex_buffer_, 0);
 
+    const bool has_indices =
+        instance.indices != nullptr && instance.index_count >= 3 &&
+        instance.index_count <= static_cast<std::size_t>(UINT_MAX);
+    if (has_indices) {
+      const std::size_t required_index_bytes =
+          instance.index_count * sizeof(std::uint32_t);
+      if (!EnsureIndexBufferCapacity(required_index_bytes)) {
+        return;
+      }
+
+      D3D11_MAPPED_SUBRESOURCE mapped_index_buffer{};
+      const HRESULT map_index_result = device_context_->Map(
+          index_buffer_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_index_buffer);
+      if (FAILED(map_index_result) || mapped_index_buffer.pData == nullptr) {
+        return;
+      }
+      std::memcpy(mapped_index_buffer.pData, instance.indices, required_index_bytes);
+      device_context_->Unmap(index_buffer_, 0);
+    }
+
     SceneConstantData constants{};
     CopyMatrix16(constants.model, instance.model_transform);
     CopyMatrix16(constants.view_projection, camera.view_projection);
@@ -453,7 +555,12 @@ float4 PSMain(PSIn input) : SV_Target {
     device_context_->VSSetShader(vertex_shader_, nullptr, 0);
     device_context_->VSSetConstantBuffers(0, 1, &scene_constant_buffer_);
     device_context_->PSSetShader(pixel_shader_, nullptr, 0);
-    device_context_->Draw(static_cast<UINT>(instance.vertex_count), 0);
+    if (has_indices) {
+      device_context_->IASetIndexBuffer(index_buffer_, DXGI_FORMAT_R32_UINT, 0);
+      device_context_->DrawIndexed(static_cast<UINT>(instance.index_count), 0, 0);
+    } else {
+      device_context_->Draw(static_cast<UINT>(instance.vertex_count), 0);
+    }
   }
 #endif
 
@@ -465,12 +572,16 @@ float4 PSMain(PSIn input) : SV_Target {
   ID3D11DeviceContext* device_context_ = nullptr;
   IDXGISwapChain* swap_chain_ = nullptr;
   ID3D11RenderTargetView* render_target_view_ = nullptr;
+  ID3D11Texture2D* depth_stencil_buffer_ = nullptr;
+  ID3D11DepthStencilView* depth_stencil_view_ = nullptr;
   ID3D11VertexShader* vertex_shader_ = nullptr;
   ID3D11PixelShader* pixel_shader_ = nullptr;
   ID3D11InputLayout* input_layout_ = nullptr;
   ID3D11Buffer* scene_constant_buffer_ = nullptr;
   ID3D11Buffer* vertex_buffer_ = nullptr;
+  ID3D11Buffer* index_buffer_ = nullptr;
   std::size_t vertex_buffer_capacity_bytes_ = 0;
+  std::size_t index_buffer_capacity_bytes_ = 0;
 #endif
 };
 

@@ -226,11 +226,6 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
     config.window_height = parsed_height;
   }
 
-  const int parsed_max_frames = ExtractIntegerValue(contents, "max_frames");
-  if (parsed_max_frames >= 0) {
-    config.max_frames = parsed_max_frames;
-  }
-
   const std::string parsed_camera_mode =
       ToLower(ExtractStringValue(contents, "camera_mode"));
   if (parsed_camera_mode == "orthographic" || parsed_camera_mode == "perspective") {

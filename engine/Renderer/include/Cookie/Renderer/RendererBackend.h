@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 namespace cookie::renderer {
@@ -36,6 +37,8 @@ struct SceneVertex {
 struct RenderMeshInstance {
   const SceneVertex* vertices = nullptr;
   std::size_t vertex_count = 0;
+  const std::uint32_t* indices = nullptr;
+  std::size_t index_count = 0;
   Float4x4 model_transform{};
 };
 

@@ -217,7 +217,8 @@ int Application::Run() const {
 
   int frame_count = 0;
   cookie::renderer::SceneBuilder scene_builder;
-  const auto triangle_vertices = cookie::renderer::MakeColoredTriangle();
+  const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices(0.5f);
+  const auto cube_indices = cookie::renderer::MakeCubeTriangleIndices();
   const float aspect_ratio =
       (config_.window_height > 0)
           ? static_cast<float>(config_.window_width) /
@@ -262,24 +263,26 @@ int Application::Run() const {
     const auto view = cookie::renderer::MakeLookAtView(
         camera_x, camera_y, camera_z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     scene_builder.Reset(cookie::renderer::MultiplyTransforms(view, view_projection));
-    const auto left_triangle_model =
+    const auto left_cube_model =
         cookie::renderer::MultiplyTransforms(
             cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, -0.25f),
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeZRotationTransform(
                     static_cast<float>(frame_count) * 0.01f),
                 cookie::renderer::MakeScaleTransform(0.8f, 0.8f, 1.0f)));
-    const auto right_triangle_model =
+    const auto right_cube_model =
         cookie::renderer::MultiplyTransforms(
             cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.35f),
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeZRotationTransform(
                     static_cast<float>(frame_count) * -0.015f),
                 cookie::renderer::MakeScaleTransform(0.5f, 0.5f, 1.0f)));
-    scene_builder.AddMeshInstance(
-        triangle_vertices.data(), triangle_vertices.size(), left_triangle_model);
-    scene_builder.AddMeshInstance(
-        triangle_vertices.data(), triangle_vertices.size(), right_triangle_model);
+    scene_builder.AddIndexedMeshInstance(
+        cube_vertices.data(), cube_vertices.size(),
+        cube_indices.data(), cube_indices.size(), left_cube_model);
+    scene_builder.AddIndexedMeshInstance(
+        cube_vertices.data(), cube_vertices.size(),
+        cube_indices.data(), cube_indices.size(), right_cube_model);
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
@@ -306,11 +309,6 @@ int Application::Run() const {
       }
     }
 
-    if (config_.max_frames > 0 && frame_count >= config_.max_frames) {
-      logger.Info("Frame loop reached max_frames, requesting shutdown.");
-      window->RequestClose();
-    }
-
     std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
@@ -326,7 +324,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 22 complete. View matrix and orbit camera skeleton wired.");
+  logger.Info("Phase 23 complete. Indexed cube render path wired.");
 
   return 0;
 }

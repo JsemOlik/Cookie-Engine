@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 22 - View Matrix And Orbit Camera Skeleton
+## Current Phase: Phase 23 - Indexed Cube Rendering And Persistent Runtime Loop
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -140,6 +140,13 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Updated runtime scene submission to compose camera `view * projection` each frame.
 - [x] Added world-depth offsets in demo instances to better expose camera behavior.
 - [x] Updated runtime phase milestone log to Phase 22 completion text.
+- [x] Added indexed mesh fields to renderer scene contracts (`indices`, `index_count`).
+- [x] Added indexed scene assembly support in `SceneBuilder`.
+- [x] Added cube primitive helpers (`MakeColoredCubeVertices`, `MakeCubeTriangleIndices`).
+- [x] Updated DX11 backend with index-buffer drawing path and depth buffer/depth-stencil usage.
+- [x] Updated runtime demo scene to render indexed cubes instead of non-indexed triangles.
+- [x] Removed `max_frames` from graphics/runtime config and removed frame-count auto-shutdown logic.
+- [x] Updated runtime phase milestone log to Phase 23 completion text.
 
 ## Not Started
 
@@ -170,7 +177,7 @@ Status: completed (skeleton scope, pending local build verification)
   - `Renderer backend initialized successfully.`
   - `Renderer backend shut down successfully.`
 - [ ] Confirm `CookieRuntime` opens a window with title from `graphics.json`.
-- [ ] Confirm window closes after `max_frames` is reached (currently `300`) or via manual close.
+- [ ] Confirm runtime remains open indefinitely until manual window close.
 - [ ] Confirm `logs/latest.log` includes frame loop start/end lines and total frame count.
 - [ ] Confirm `cmake --build out/build/x64-debug` succeeds after the Unicode Win32 API fix.
 - [ ] Confirm runtime log includes asset mount lines for `content/base.pak` and discovered asset count.
@@ -260,6 +267,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Toggle `camera_orbit_enabled` true/false and confirm camera motion starts/stops while scene still renders.
 - [ ] Adjust `camera_orbit_radius` and `camera_orbit_speed` in `graphics.json` and confirm visible camera path changes.
 - [ ] Confirm runtime and exported game logs now end with `Phase 22 complete. View matrix and orbit camera skeleton wired.`.
+- [ ] Build and run `CookieRuntime` and confirm indexed cube geometry is visible (not just flat 2D triangle output).
+- [ ] Confirm runtime and exported game logs now end with `Phase 23 complete. Indexed cube render path wired.`.
+- [ ] Confirm there is no `max_frames` setting in `config/graphics.json` and runtime no longer auto-closes by frame count.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -319,13 +329,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 20 now uses renderer-owned camera projection math for runtime scene submission and validates multi-instance world-space rendering.
 - Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
 - Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
+- Phase 23 now introduces indexed/depth-tested cube rendering and removes automatic frame-count shutdown behavior.
 
 ## Best Next Step
 
-Phase 23: start first true 3D object path by introducing indexed mesh support in renderer contracts and render a simple cube mesh with depth-friendly camera defaults.
+Phase 24: add basic raster state controls (backface culling + wireframe debug toggle) and configurable per-scene rotation/placement values in `graphics.json` for faster visual debugging.
 
 ## Suggested Commit Message
 
 ```text
-feat: add look-at view matrix and orbit camera skeleton
+feat: add indexed cube rendering and remove max-frames auto shutdown
 ```

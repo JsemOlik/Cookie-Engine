@@ -512,7 +512,6 @@ int main(int argc, char** argv) {
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
-      .max_frames = renderer_config.max_frames,
       .camera_mode = renderer_config.camera_mode,
       .camera_ortho_height = renderer_config.camera_ortho_height,
       .camera_perspective_fov_degrees =

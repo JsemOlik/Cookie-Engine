@@ -295,6 +295,12 @@ Add renderer-side view matrix helper (`LookAt`) and use it in runtime camera upd
 
 Milestone: runtime composes `view * projection` from config-driven camera settings, supports orbit on/off, and validates camera motion independent of object transforms.
 
+### [x] Phase 23: Indexed Cube Rendering And Persistent Runtime Loop
+
+Add indexed mesh support to renderer scene contracts and DX11 backend draw path, then render the first cube primitives while removing frame-count-based auto-shutdown from runtime.
+
+Milestone: runtime renders indexed cube geometry (depth-tested) and remains open until user closes the window.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

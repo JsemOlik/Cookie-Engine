@@ -31,7 +31,6 @@ struct ApplicationConfig {
   std::string window_title;
   int window_width = 1280;
   int window_height = 720;
-  int max_frames = 0;
   std::string camera_mode = "orthographic";
   float camera_ortho_height = 2.8f;
   float camera_perspective_fov_degrees = 60.0f;
