@@ -12,6 +12,11 @@ struct EngineConfig {
   std::string physics_module = "bin/Physics.dll";
   std::string audio_module = "bin/Audio.dll";
   std::string core_module = "bin/Core.dll";
+  bool strict_module_mode = false;
+  bool require_core_module = false;
+  bool require_renderer_module = false;
+  bool require_physics_module = false;
+  bool require_audio_module = false;
 };
 
 EngineConfig LoadEngineConfig(const std::filesystem::path& engine_config_path);

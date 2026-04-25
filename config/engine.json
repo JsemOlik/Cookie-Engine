@@ -4,5 +4,10 @@
   "renderer_dx11_module": "bin/RendererDX11.dll",
   "physics_module": "bin/Physics.dll",
   "audio_module": "bin/Audio.dll",
-  "core_module": "bin/Core.dll"
+  "core_module": "bin/Core.dll",
+  "strict_module_mode": false,
+  "require_core_module": false,
+  "require_renderer_module": false,
+  "require_physics_module": false,
+  "require_audio_module": false
 }

@@ -235,6 +235,12 @@ Add a `Core.dll` module artifact with exported identity/version symbols, and pro
 
 Milestone: runtime reports `Core runtime source` as `module` when `Core.dll` is available and falls back cleanly when unavailable, while preserving current static-link behavior.
 
+### [x] Phase 13: Optional Strict Module Mode
+
+Add config-driven strict mode controls that can require module loading for core, renderer, physics, and audio at runtime.
+
+Milestone: runtime keeps fallback behavior by default, but can fail fast with clear log errors when required modules are unavailable.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

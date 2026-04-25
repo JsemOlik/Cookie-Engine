@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 12 - Core Module Boundary Skeleton
+## Current Phase: Phase 13 - Optional Strict Module Mode
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -96,6 +96,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added explicit startup logs for core runtime source (`module` vs `static-fallback`), module path, module name, and API version.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_core_module`.
 - [x] Updated export tool to warn when `Core.dll` is missing at export source.
+- [x] Added strict module-mode config flags in `engine.json` and `EngineConfig` parser.
+- [x] Added runtime startup logging for strict module mode state.
+- [x] Added fail-fast enforcement for required module availability (core/renderer/physics/audio) with clear error logs.
 
 ## Not Started
 
@@ -184,6 +187,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Confirm runtime logs include `Core runtime source: static-fallback` when `Core.dll` is unavailable.
 - [x] Confirm runtime logs include `Core module name: CookieCoreModule` and `Core module API version: 1` when module loads.
 - [x] Run `CookieExportTool` and confirm exported `bin/Core.dll` exists.
+- [ ] Set `strict_module_mode=true`, remove one module DLL, and confirm runtime exits early with a clear required-module error.
+- [ ] Set `strict_module_mode=false` and `require_renderer_module=true`, remove `RendererDX11.dll`, and confirm runtime exits with renderer-required error.
+- [ ] Set all strict/require flags to false, remove one module DLL, and confirm runtime falls back and still runs.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -232,13 +238,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Exported `MyGame.exe` was validated with `RendererDX11.dll`, `Physics.dll`, and `Audio.dll` all loading from exported `bin/`.
 - `engine/Core` now also builds `Core.dll` as a module artifact with exported identity/version symbols.
 - Runtime now probes the configured `core_module` path and logs core module metadata on success.
+- Runtime strict module mode is now configurable through `strict_module_mode` and per-module `require_*` flags in `engine.json`.
 
 ## Best Next Step
 
-Start planning reduction of static fallback paths and begin transitioning selected subsystems to strict module-required mode behind config flags.
+Begin introducing optional CI/release profile configs that enable strict module mode by default while keeping dev profile fallback-friendly.
 
 ## Suggested Commit Message
 
 ```text
-feat: add core module boundary probe and export skeleton
+feat: add optional strict module mode enforcement
 ```

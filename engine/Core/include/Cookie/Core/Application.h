@@ -15,6 +15,11 @@ struct ApplicationConfig {
   std::string core_module_path;
   std::string core_module_name;
   int core_module_api_version = 0;
+  bool strict_module_mode = false;
+  bool require_core_module = false;
+  bool require_renderer_module = false;
+  bool require_physics_module = false;
+  bool require_audio_module = false;
   std::string renderer_backend_name;
   std::string renderer_runtime_source;
   std::string renderer_module_path;

@@ -34,6 +34,8 @@ int Application::Run() const {
 
   logger.Info("CookieRuntime startup sequence initialized.");
   logger.Info("Application: " + config_.application_name);
+  logger.Info("Strict module mode: " +
+              std::string(config_.strict_module_mode ? "true" : "false"));
   if (!config_.core_runtime_source.empty()) {
     logger.Info("Core runtime source: " + config_.core_runtime_source);
   }
@@ -76,6 +78,31 @@ int Application::Run() const {
   logger.Info("Input config: " + paths.input_config.string());
   logger.Info("Game config: " + paths.game_config.string());
 
+  if (config_.require_core_module &&
+      config_.core_runtime_source != "module") {
+    logger.Error(
+        "Core module is required but runtime is in fallback mode.");
+    return 2;
+  }
+  if (config_.require_renderer_module &&
+      config_.renderer_runtime_source != "module") {
+    logger.Error(
+        "Renderer module is required but runtime is in fallback mode.");
+    return 3;
+  }
+  if (config_.require_physics_module &&
+      config_.physics_runtime_source != "module") {
+    logger.Error(
+        "Physics module is required but runtime is in fallback mode.");
+    return 4;
+  }
+  if (config_.require_audio_module &&
+      config_.audio_runtime_source != "module") {
+    logger.Error(
+        "Audio module is required but runtime is in fallback mode.");
+    return 5;
+  }
+
   GameLogicModule game_logic;
   const auto game_logic_from_repo = paths.project_root / "bin" / "GameLogic.dll";
   const auto game_logic_from_runtime =
@@ -101,21 +128,21 @@ int Application::Run() const {
 
   if (!renderer_backend_) {
     logger.Error("No renderer backend instance is available.");
-    return 2;
+    return 6;
   }
   if (!audio_backend_) {
     logger.Error("No audio backend instance is available.");
-    return 3;
+    return 7;
   }
   if (!physics_backend_) {
     logger.Error("No physics backend instance is available.");
-    return 4;
+    return 8;
   }
 
   logger.Info("Initializing audio backend.");
   if (!audio_backend_->Initialize()) {
     logger.Error("Audio backend failed to initialize.");
-    return 5;
+    return 9;
   }
   logger.Info("Audio backend initialized successfully.");
 
@@ -123,7 +150,7 @@ int Application::Run() const {
   if (!physics_backend_->Initialize()) {
     logger.Error("Physics backend failed to initialize.");
     audio_backend_->Shutdown();
-    return 6;
+    return 10;
   }
   logger.Info("Physics backend initialized successfully.");
 
@@ -133,7 +160,7 @@ int Application::Run() const {
     logger.Error("Renderer backend failed to initialize.");
     physics_backend_->Shutdown();
     audio_backend_->Shutdown();
-    return 7;
+    return 11;
   }
   logger.Info("Renderer backend initialized successfully.");
 
@@ -147,7 +174,7 @@ int Application::Run() const {
     renderer_backend_->Shutdown();
     physics_backend_->Shutdown();
     audio_backend_->Shutdown();
-    return 8;
+    return 12;
   }
 
   logger.Info("Platform window created successfully.");
@@ -217,7 +244,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 12 skeleton complete. Core probe plus renderer, physics, and audio module loader contracts wired.");
+  logger.Info("Phase 13 skeleton complete. Strict module mode enforcement wired.");
 
   return 0;
 }

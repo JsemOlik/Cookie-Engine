@@ -74,6 +74,10 @@ std::filesystem::path ResolveModulePath(
   return root / configured;
 }
 
+bool IsModuleRequired(const cookie::core::EngineConfig& config, bool specific_flag) {
+  return config.strict_module_mode || specific_flag;
+}
+
 class DynamicRendererProxy final : public cookie::renderer::IRendererBackend {
  public:
   DynamicRendererProxy(
@@ -442,6 +446,15 @@ int main() {
       .core_module_path = core_bootstrap.module_path,
       .core_module_name = core_bootstrap.module_name,
       .core_module_api_version = core_bootstrap.module_api_version,
+      .strict_module_mode = engine_config.strict_module_mode,
+      .require_core_module =
+          IsModuleRequired(engine_config, engine_config.require_core_module),
+      .require_renderer_module =
+          IsModuleRequired(engine_config, engine_config.require_renderer_module),
+      .require_physics_module =
+          IsModuleRequired(engine_config, engine_config.require_physics_module),
+      .require_audio_module =
+          IsModuleRequired(engine_config, engine_config.require_audio_module),
       .renderer_backend_name = renderer_config.backend_name,
       .renderer_runtime_source = renderer_bootstrap.runtime_source,
       .renderer_module_path = renderer_bootstrap.module_path,
