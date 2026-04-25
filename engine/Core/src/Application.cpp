@@ -39,6 +39,12 @@ int Application::Run() const {
   if (!config_.renderer_module_path.empty()) {
     logger.Info("Renderer module path: " + config_.renderer_module_path);
   }
+  if (!config_.physics_runtime_source.empty()) {
+    logger.Info("Physics runtime source: " + config_.physics_runtime_source);
+  }
+  if (!config_.physics_module_path.empty()) {
+    logger.Info("Physics module path: " + config_.physics_module_path);
+  }
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
@@ -171,7 +177,7 @@ int Application::Run() const {
   logger.Info("Renderer backend shut down successfully.");
   physics_backend_->Shutdown();
   logger.Info("Physics backend shut down successfully.");
-  logger.Info("Phase 7 skeleton complete. Game logic module contract wired.");
+  logger.Info("Phase 10 skeleton complete. Renderer and physics module loader contracts wired.");
 
   return 0;
 }

@@ -90,7 +90,6 @@ void WriteExportReport(
 
   report << "Future module placeholders (expected in later phases):\n";
   report << " - Core.dll\n";
-  report << " - Physics.dll\n";
   report << " - Audio.dll\n\n";
 
   if (!result.warnings.empty()) {

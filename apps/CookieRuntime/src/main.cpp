@@ -1,11 +1,12 @@
 #include "Cookie/Core/Application.h"
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/EngineConfig.h"
+#include "Cookie/Core/PhysicsBackend.h"
 #include "Cookie/Platform/PlatformLibrary.h"
 #include "Cookie/Platform/PlatformPaths.h"
+#include "Cookie/Physics/JoltPhysicsBackend.h"
 #include "Cookie/Renderer/RendererBackend.h"
 #include "Cookie/Renderer/RendererConfig.h"
-#include "Cookie/Physics/JoltPhysicsBackend.h"
 #include "Cookie/RendererDX11/RendererDX11Backend.h"
 
 #include <filesystem>
@@ -16,12 +17,22 @@ namespace {
 
 using RendererCreateFn = cookie::renderer::IRendererBackend* (*)();
 using RendererDestroyFn = void (*)(cookie::renderer::IRendererBackend*);
+using PhysicsCreateFn = cookie::core::IPhysicsBackend* (*)();
+using PhysicsDestroyFn = void (*)(cookie::core::IPhysicsBackend*);
 
 constexpr const char* kCreateRendererSymbol = "CookieCreateRendererBackend";
 constexpr const char* kDestroyRendererSymbol = "CookieDestroyRendererBackend";
+constexpr const char* kCreatePhysicsSymbol = "CookieCreatePhysicsBackend";
+constexpr const char* kDestroyPhysicsSymbol = "CookieDestroyPhysicsBackend";
 
 struct RendererBootstrapResult {
   std::unique_ptr<cookie::renderer::IRendererBackend> backend;
+  std::string runtime_source;
+  std::string module_path;
+};
+
+struct PhysicsBootstrapResult {
+  std::unique_ptr<cookie::core::IPhysicsBackend> backend;
   std::string runtime_source;
   std::string module_path;
 };
@@ -95,6 +106,46 @@ class DynamicRendererProxy final : public cookie::renderer::IRendererBackend {
   RendererDestroyFn destroy_ = nullptr;
 };
 
+class DynamicPhysicsProxy final : public cookie::core::IPhysicsBackend {
+ public:
+  DynamicPhysicsProxy(
+      cookie::platform::LibraryHandle module,
+      cookie::core::IPhysicsBackend* backend, PhysicsDestroyFn destroy)
+      : module_(module), backend_(backend), destroy_(destroy) {}
+
+  ~DynamicPhysicsProxy() override {
+    if (backend_ && destroy_) {
+      destroy_(backend_);
+    }
+    if (module_) {
+      cookie::platform::UnloadDynamicLibrary(module_);
+    }
+  }
+
+  bool Initialize() override {
+    return backend_ && backend_->Initialize();
+  }
+
+  cookie::core::PhysicsStepStats StepSimulation(
+      const cookie::core::PhysicsStepConfig& config) override {
+    if (!backend_) {
+      return {};
+    }
+    return backend_->StepSimulation(config);
+  }
+
+  void Shutdown() override {
+    if (backend_) {
+      backend_->Shutdown();
+    }
+  }
+
+ private:
+  cookie::platform::LibraryHandle module_ = nullptr;
+  cookie::core::IPhysicsBackend* backend_ = nullptr;
+  PhysicsDestroyFn destroy_ = nullptr;
+};
+
 std::unique_ptr<cookie::renderer::IRendererBackend> TryCreateRendererFromModule(
     const std::filesystem::path& module_path) {
   const auto module = cookie::platform::LoadDynamicLibrary(module_path);
@@ -118,6 +169,31 @@ std::unique_ptr<cookie::renderer::IRendererBackend> TryCreateRendererFromModule(
   }
 
   return std::make_unique<DynamicRendererProxy>(module, backend, destroy_fn);
+}
+
+std::unique_ptr<cookie::core::IPhysicsBackend> TryCreatePhysicsFromModule(
+    const std::filesystem::path& module_path) {
+  const auto module = cookie::platform::LoadDynamicLibrary(module_path);
+  if (!module) {
+    return nullptr;
+  }
+
+  const auto create_fn = reinterpret_cast<PhysicsCreateFn>(
+      cookie::platform::GetLibrarySymbol(module, kCreatePhysicsSymbol));
+  const auto destroy_fn = reinterpret_cast<PhysicsDestroyFn>(
+      cookie::platform::GetLibrarySymbol(module, kDestroyPhysicsSymbol));
+  if (!create_fn || !destroy_fn) {
+    cookie::platform::UnloadDynamicLibrary(module);
+    return nullptr;
+  }
+
+  auto* backend = create_fn();
+  if (!backend) {
+    cookie::platform::UnloadDynamicLibrary(module);
+    return nullptr;
+  }
+
+  return std::make_unique<DynamicPhysicsProxy>(module, backend, destroy_fn);
 }
 
 RendererBootstrapResult CreateRendererBackend(
@@ -156,6 +232,35 @@ RendererBootstrapResult CreateRendererBackend(
   return {};
 }
 
+PhysicsBootstrapResult CreatePhysicsBackend(
+    const cookie::core::EngineConfig& engine_config,
+    const cookie::core::StartupPaths& paths) {
+  const auto from_project_root =
+      ResolveModulePath(paths.project_root, engine_config.physics_module);
+  if (auto module_backend = TryCreatePhysicsFromModule(from_project_root)) {
+    return {
+        .backend = std::move(module_backend),
+        .runtime_source = "module",
+        .module_path = from_project_root.string(),
+    };
+  }
+
+  const auto from_runtime_dir = ResolveModulePath(
+      cookie::platform::GetExecutableDirectory(), engine_config.physics_module);
+  if (auto module_backend = TryCreatePhysicsFromModule(from_runtime_dir)) {
+    return {
+        .backend = std::move(module_backend),
+        .runtime_source = "module",
+        .module_path = from_runtime_dir.string(),
+    };
+  }
+
+  return {
+      .backend = cookie::physics::CreateJoltPhysicsBackend(),
+      .runtime_source = "static-fallback",
+  };
+}
+
 } // namespace
 
 int main() {
@@ -166,19 +271,21 @@ int main() {
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
   auto renderer_bootstrap =
       CreateRendererBackend(renderer_config.backend_name, engine_config, paths);
-  auto physics_backend = cookie::physics::CreateJoltPhysicsBackend();
+  auto physics_bootstrap = CreatePhysicsBackend(engine_config, paths);
 
   cookie::core::Application app({
       .application_name = engine_config.runtime_name,
       .renderer_backend_name = renderer_config.backend_name,
       .renderer_runtime_source = renderer_bootstrap.runtime_source,
       .renderer_module_path = renderer_bootstrap.module_path,
+      .physics_runtime_source = physics_bootstrap.runtime_source,
+      .physics_module_path = physics_bootstrap.module_path,
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
-  }, std::move(physics_backend), std::move(renderer_bootstrap.backend));
+  }, std::move(physics_bootstrap.backend), std::move(renderer_bootstrap.backend));
 
   return app.Run();
 }

@@ -14,4 +14,5 @@ target_compile_features(CookieRuntime PRIVATE cxx_std_20)
 
 add_dependencies(CookieRuntime
   cookie_renderer_dx11_module
+  cookie_physics_module
 )

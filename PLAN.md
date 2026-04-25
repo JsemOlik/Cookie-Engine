@@ -217,6 +217,12 @@ Add manifest-driven module path configuration and migrate the first runtime subs
 
 Milestone: runtime can read renderer module path from `engine.json`, load `RendererDX11.dll` through exported factory symbols, and still fall back to static wiring if DLL loading fails.
 
+### [x] Phase 10: Physics Module Loader Skeleton
+
+Migrate physics runtime creation to the same manifest-driven DLL pattern as renderer, with a static fallback during transition.
+
+Milestone: runtime can read physics module path from `engine.json`, load `Physics.dll` through exported factory symbols, and still fall back to static `CreateJoltPhysicsBackend()` when DLL loading fails.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

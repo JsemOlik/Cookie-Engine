@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 9 - Runtime Module Loader (Renderer Slice)
+## Current Phase: Phase 10 - Runtime Module Loader (Physics Slice)
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -79,6 +79,10 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added explicit startup logs for renderer runtime source (`module` vs `static-fallback`) and resolved module path.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_renderer_dx11_module`.
 - [x] Updated export tool to copy module DLLs from runtime `bin/` to exported game `bin/`.
+- [x] Added `Physics` shared module target (`Physics.dll`) with exported create/destroy backend symbols.
+- [x] Updated runtime bootstrap to try dynamic physics module loading using engine config, with static Jolt fallback.
+- [x] Added explicit startup logs for physics runtime source (`module` vs `static-fallback`) and resolved module path.
+- [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_physics_module`.
 
 ## Not Started
 
@@ -151,6 +155,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Confirm runtime logs include `Renderer runtime source: module` when `RendererDX11.dll` is loaded.
 - [ ] Confirm runtime logs include `Renderer runtime source: static-fallback` when `RendererDX11.dll` is unavailable.
 - [ ] Run `CookieExportTool` and confirm exported `bin/RendererDX11.dll` exists.
+- [ ] Build and run `CookieRuntime`, then confirm physics initializes when `Physics.dll` is present in runtime `bin/`.
+- [ ] Temporarily rename runtime `bin/Physics.dll` and confirm runtime still starts via static fallback path.
+- [ ] Confirm runtime logs include `Physics runtime source: module` when `Physics.dll` is loaded.
+- [ ] Confirm runtime logs include `Physics runtime source: static-fallback` when `Physics.dll` is unavailable.
+- [ ] Run `CookieExportTool` and confirm exported `bin/Physics.dll` exists.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -185,18 +194,20 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 7 adds dynamic game module loading shape without introducing scripting/runtime reflection yet.
 - Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
 - Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
-- Export currently reports future module placeholders (`Core.dll`, `RendererDX11.dll`, `Physics.dll`, `Audio.dll`) rather than producing those DLLs yet.
+- Export currently reports future module placeholders (`Core.dll`, `Audio.dll`) rather than producing those DLLs yet.
 - Runtime startup path detection now treats executable directory as project root when it contains exported `config/`, `content/`, and `logs/`.
 - Runtime now supports manifest-driven renderer module path in `engine.json`.
 - `modules/RendererDX11` now builds both static fallback library and shared module DLL for runtime loading transition.
 - Export tool now copies runtime module DLLs from `apps/CookieRuntime/bin` into exported `bin/`.
+- `modules/Physics` now builds both static fallback library and shared module DLL for runtime loading transition.
+- Runtime now supports manifest-driven physics module path in `engine.json`.
 
 ## Best Next Step
 
-Migrate physics boundary from static link to manifest-driven DLL loading (`Physics.dll`) with the same load/fallback pattern used for renderer.
+Begin audio boundary planning with the same module loader pattern (`Audio.dll`) while keeping audio feature behavior as skeleton-only.
 
 ## Suggested Commit Message
 
 ```text
-feat: add manifest-driven renderer module loading skeleton
+feat: add manifest-driven physics module loading skeleton
 ```
