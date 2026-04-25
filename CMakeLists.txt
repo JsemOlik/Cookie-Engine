@@ -14,7 +14,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Phase 1 adds the first runtime/core/platform skeleton.
 add_subdirectory(engine/Platform)
+add_subdirectory(engine/Assets)
 add_subdirectory(engine/Core)
 add_subdirectory(engine/Renderer)
 add_subdirectory(modules/RendererDX11)
 add_subdirectory(apps/CookieRuntime)
+add_subdirectory(tools)

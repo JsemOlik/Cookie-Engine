@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 3 - Windowing And Frame Loop Skeleton
+## Current Phase: Phase 4 - Asset Package Mount/List Skeleton
 
 Status: completed (skeleton scope)
 
@@ -31,6 +31,13 @@ Status: completed (skeleton scope)
 - [x] Updated DX11 backend skeleton to implement frame lifecycle as non-rendering stubs.
 - [x] Added runtime frame loop that drives renderer methods through interfaces.
 - [x] Extended `graphics.json` support with window settings, clear color, and optional `max_frames`.
+- [x] Fixed Win32 window API usage to explicit Unicode (`W`) calls for MSVC builds.
+- [x] Fixed Win32 cursor resource id for `LoadCursorW` in non-UNICODE builds using `MAKEINTRESOURCEW(32512)`.
+- [x] Added `engine/Assets` module with package loader and asset registry interfaces.
+- [x] Added text `.pak` skeleton loader for mounting and listing asset IDs.
+- [x] Added runtime asset package mount attempt for `content/base.pak` with log output.
+- [x] Added `CookiePakTool` CLI under `tools/` for quick package inspection.
+- [x] Added sample `content/base.pak` package manifest.
 
 ## Not Started
 
@@ -41,7 +48,7 @@ Status: completed (skeleton scope)
 - [x] Platform window abstraction skeleton.
 - [x] Runtime frame loop skeleton.
 - [ ] Jolt physics integration.
-- [ ] Asset package format and `.pak` tooling.
+- [x] Asset package format and `.pak` tooling (skeleton text format).
 - [ ] Game logic module loading.
 - [ ] Exported game packaging.
 - [ ] OpenGL backend.
@@ -63,7 +70,10 @@ Status: completed (skeleton scope)
 - [ ] Confirm `CookieRuntime` opens a window with title from `graphics.json`.
 - [ ] Confirm window closes after `max_frames` is reached (currently `300`) or via manual close.
 - [ ] Confirm `logs/latest.log` includes frame loop start/end lines and total frame count.
-- [x] Confirm no real DirectX rendering code, physics, editor UI, asset packer, runtime module loading, OpenGL, save, or mod implementation was added.
+- [ ] Confirm `cmake --build out/build/x64-debug` succeeds after the Unicode Win32 API fix.
+- [ ] Confirm runtime log includes asset mount lines for `content/base.pak` and discovered asset count.
+- [ ] Build and run `CookiePakTool` against `content/base.pak` and confirm listed asset IDs.
+- [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
 
@@ -76,13 +86,18 @@ Status: completed (skeleton scope)
 - Runtime backend selection currently reads `renderer` from `config/graphics.json` and defaults to `dx11` if the file is missing.
 - Phase 3 added platform windowing and frame loop contracts while keeping renderer calls API-neutral.
 - Win32 implementation is contained in `engine/Platform`; non-Windows currently returns no window instance.
+- Build error cause: mixed narrow/wide Win32 APIs in `PlatformWindow.cpp` under MSVC.
+- Fix applied: switched to `RegisterClassW`, `CreateWindowExW`, `DefWindowProcW`, `LoadCursorW`, and `GetModuleHandleW`.
+- Follow-up fix: switched cursor id to `MAKEINTRESOURCEW(32512)` for `LoadCursorW` compatibility across SDK setups.
+- Phase 4 introduces a temporary text `.pak` skeleton for asset mount/list flow only.
+- Runtime now attempts to mount `content/base.pak` and logs package/asset counts.
 
 ## Best Next Step
 
-Start Phase 4 by adding asset system interfaces and a first `.pak` mount/list skeleton in `engine/Assets` and `tools/`.
+Start Phase 5 by integrating Jolt Physics as a separate module boundary through API-neutral core interfaces.
 
 ## Suggested Commit Message
 
 ```text
-feat: add windowing and frame-loop skeleton contracts
+feat: add asset package mount and listing skeleton
 ```

@@ -84,11 +84,11 @@ LRESULT CALLBACK WindowProc(HWND window_handle, UINT message, WPARAM w_param,
       GetWindowLongPtr(window_handle, GWLP_USERDATA));
 
   if (message == WM_NCCREATE) {
-    const auto* create_struct = reinterpret_cast<CREATESTRUCT*>(l_param);
+    const auto* create_struct = reinterpret_cast<CREATESTRUCTW*>(l_param);
     auto* incoming = reinterpret_cast<Win32Window*>(create_struct->lpCreateParams);
     SetWindowLongPtr(window_handle, GWLP_USERDATA,
                      reinterpret_cast<LONG_PTR>(incoming));
-    return DefWindowProc(window_handle, message, w_param, l_param);
+    return DefWindowProcW(window_handle, message, w_param, l_param);
   }
 
   if (window_instance != nullptr) {
@@ -101,7 +101,7 @@ LRESULT CALLBACK WindowProc(HWND window_handle, UINT message, WPARAM w_param,
     }
   }
 
-  return DefWindowProc(window_handle, message, w_param, l_param);
+  return DefWindowProcW(window_handle, message, w_param, l_param);
 }
 
 ATOM EnsureWindowClass(HINSTANCE instance) {
@@ -110,13 +110,13 @@ ATOM EnsureWindowClass(HINSTANCE instance) {
     return cached_class;
   }
 
-  WNDCLASS window_class{};
+  WNDCLASSW window_class{};
   window_class.lpfnWndProc = WindowProc;
   window_class.hInstance = instance;
   window_class.lpszClassName = L"CookieEngineWindowClass";
-  window_class.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  window_class.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
 
-  cached_class = RegisterClass(&window_class);
+  cached_class = RegisterClassW(&window_class);
   return cached_class;
 }
 
@@ -124,7 +124,7 @@ ATOM EnsureWindowClass(HINSTANCE instance) {
 
 std::unique_ptr<IPlatformWindow> CreatePlatformWindow(
     const WindowCreateInfo& create_info) {
-  HINSTANCE instance = GetModuleHandle(nullptr);
+  HINSTANCE instance = GetModuleHandleW(nullptr);
   const ATOM window_class = EnsureWindowClass(instance);
   if (window_class == 0) {
     return nullptr;
@@ -134,8 +134,10 @@ std::unique_ptr<IPlatformWindow> CreatePlatformWindow(
   auto window = std::make_unique<Win32Window>(nullptr);
 
   const std::wstring wide_title = ToWideString(create_info.title);
-  HWND handle = CreateWindowEx(
-      0, MAKEINTATOM(window_class),
+  const auto class_name = reinterpret_cast<LPCWSTR>(
+      static_cast<ULONG_PTR>(window_class));
+  HWND handle = CreateWindowExW(
+      0, class_name,
       wide_title.empty() ? L"CookieRuntime" : wide_title.c_str(),
       WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
       create_info.width, create_info.height, nullptr, nullptr, instance,

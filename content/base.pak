@@ -1,0 +1,5 @@
+# Cookie Engine text .pak skeleton (phase 4)
+meshes/cube.mesh
+textures/checkerboard.png
+materials/default.mat
+audio/click.wav

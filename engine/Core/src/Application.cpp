@@ -7,6 +7,7 @@
 
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/Logger.h"
+#include "Cookie/Assets/AssetRegistry.h"
 #include "Cookie/Platform/PlatformWindow.h"
 
 namespace cookie::core {
@@ -36,6 +37,17 @@ int Application::Run() const {
   logger.Info("Graphics config: " + paths.graphics_config.string());
   logger.Info("Input config: " + paths.input_config.string());
   logger.Info("Game config: " + paths.game_config.string());
+
+  cookie::assets::AssetRegistry assets;
+  const auto base_package = paths.project_root / "content" / "base.pak";
+  if (assets.MountPackage(base_package)) {
+    logger.Info("Mounted asset package: " + base_package.string());
+    logger.Info("Mounted package count: " +
+                std::to_string(assets.GetMountedPackageCount()));
+    logger.Info("Discovered asset ids: " + std::to_string(assets.GetAssetCount()));
+  } else {
+    logger.Error("Failed to mount asset package: " + base_package.string());
+  }
 
   if (!renderer_backend_) {
     logger.Error("No renderer backend instance is available.");
@@ -89,7 +101,7 @@ int Application::Run() const {
   logger.Info("Frame loop ended after " + std::to_string(frame_count) + " frames.");
   renderer_backend_->Shutdown();
   logger.Info("Renderer backend shut down successfully.");
-  logger.Info("Phase 3 skeleton complete. Windowing and frame loop contracts wired.");
+  logger.Info("Phase 4 skeleton complete. Asset mount/list contracts wired.");
 
   return 0;
 }

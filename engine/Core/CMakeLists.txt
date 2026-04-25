@@ -11,6 +11,7 @@ target_include_directories(cookie_core
 
 target_link_libraries(cookie_core
   PUBLIC
+    cookie_assets
     cookie_platform
     cookie_renderer
 )
