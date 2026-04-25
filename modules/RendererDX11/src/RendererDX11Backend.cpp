@@ -13,6 +13,16 @@ class RendererDX11Backend final : public IRendererBackend {
     return true;
   }
 
+  bool BeginFrame() override {
+    return initialized_;
+  }
+
+  void Clear(const ClearColor& color) override {
+    (void)color;
+  }
+
+  void EndFrame() override {}
+
   void Shutdown() override {
     initialized_ = false;
   }

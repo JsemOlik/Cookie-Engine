@@ -1,10 +1,13 @@
 #include "Cookie/Core/Application.h"
 
+#include <chrono>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/Logger.h"
+#include "Cookie/Platform/PlatformWindow.h"
 
 namespace cookie::core {
 
@@ -24,6 +27,9 @@ int Application::Run() const {
   logger.Info("CookieRuntime startup sequence initialized.");
   logger.Info("Application: " + config_.application_name);
   logger.Info("Selected renderer backend: " + config_.renderer_backend_name);
+  logger.Info("Window title: " + config_.window_title);
+  logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
+              std::to_string(config_.window_height));
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -42,11 +48,48 @@ int Application::Run() const {
     logger.Error("Renderer backend failed to initialize.");
     return 3;
   }
-
   logger.Info("Renderer backend initialized successfully.");
+
+  auto window = cookie::platform::CreatePlatformWindow({
+      .title = config_.window_title,
+      .width = config_.window_width,
+      .height = config_.window_height,
+  });
+  if (!window) {
+    logger.Error("Platform window creation failed.");
+    renderer_backend_->Shutdown();
+    return 4;
+  }
+
+  logger.Info("Platform window created successfully.");
+  logger.Info("Starting frame loop.");
+
+  int frame_count = 0;
+  while (!window->ShouldClose()) {
+    window->PollEvents();
+
+    if (!renderer_backend_->BeginFrame()) {
+      logger.Error("Renderer backend BeginFrame failed.");
+      window->RequestClose();
+      break;
+    }
+
+    renderer_backend_->Clear(config_.clear_color);
+    renderer_backend_->EndFrame();
+
+    ++frame_count;
+    if (config_.max_frames > 0 && frame_count >= config_.max_frames) {
+      logger.Info("Frame loop reached max_frames, requesting shutdown.");
+      window->RequestClose();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+  }
+
+  logger.Info("Frame loop ended after " + std::to_string(frame_count) + " frames.");
   renderer_backend_->Shutdown();
   logger.Info("Renderer backend shut down successfully.");
-  logger.Info("Phase 2 skeleton complete. Renderer interface and DX11 module wired.");
+  logger.Info("Phase 3 skeleton complete. Windowing and frame loop contracts wired.");
 
   return 0;
 }

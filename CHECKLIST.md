@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 2 - Renderer Abstraction And DX11 Skeleton
+## Current Phase: Phase 3 - Windowing And Frame Loop Skeleton
 
 Status: completed (skeleton scope)
 
@@ -25,6 +25,12 @@ Status: completed (skeleton scope)
 - [x] Added `modules/RendererDX11` backend skeleton (initialize/shutdown/name only, no DirectX calls).
 - [x] Wired `CookieRuntime` to select backend by config and run initialize/shutdown lifecycle.
 - [x] Added placeholder config files (`engine.json`, `graphics.json`, `input.cfg`, `game.json`).
+- [x] Added platform window abstraction (`IPlatformWindow`) in `engine/Platform`.
+- [x] Added Win32 window creation and message polling implementation behind platform interfaces.
+- [x] Extended renderer abstraction with frame lifecycle methods (`BeginFrame`, `Clear`, `EndFrame`).
+- [x] Updated DX11 backend skeleton to implement frame lifecycle as non-rendering stubs.
+- [x] Added runtime frame loop that drives renderer methods through interfaces.
+- [x] Extended `graphics.json` support with window settings, clear color, and optional `max_frames`.
 
 ## Not Started
 
@@ -32,6 +38,8 @@ Status: completed (skeleton scope)
 - [ ] Cookie Editor Qt Widgets shell.
 - [x] Renderer abstraction.
 - [x] DirectX 11 renderer module skeleton.
+- [x] Platform window abstraction skeleton.
+- [x] Runtime frame loop skeleton.
 - [ ] Jolt physics integration.
 - [ ] Asset package format and `.pak` tooling.
 - [ ] Game logic module loading.
@@ -52,7 +60,10 @@ Status: completed (skeleton scope)
   - `Initializing renderer backend: dx11`
   - `Renderer backend initialized successfully.`
   - `Renderer backend shut down successfully.`
-- [x] Confirm no renderer drawing, physics, editor UI, asset packer, runtime module loading, OpenGL, save, or mod implementation was added.
+- [ ] Confirm `CookieRuntime` opens a window with title from `graphics.json`.
+- [ ] Confirm window closes after `max_frames` is reached (currently `300`) or via manual close.
+- [ ] Confirm `logs/latest.log` includes frame loop start/end lines and total frame count.
+- [x] Confirm no real DirectX rendering code, physics, editor UI, asset packer, runtime module loading, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
 
@@ -63,13 +74,15 @@ Status: completed (skeleton scope)
 - Phase 1 skeleton code was added without introducing renderer/editor/physics implementations.
 - Phase 2 added renderer abstraction and DX11 backend skeleton only (no DirectX API usage yet).
 - Runtime backend selection currently reads `renderer` from `config/graphics.json` and defaults to `dx11` if the file is missing.
+- Phase 3 added platform windowing and frame loop contracts while keeping renderer calls API-neutral.
+- Win32 implementation is contained in `engine/Platform`; non-Windows currently returns no window instance.
 
 ## Best Next Step
 
-Start Phase 3 by adding platform window creation and a minimal renderer-facing frame loop contract, while still keeping DirectX implementation details inside `modules/RendererDX11`.
+Start Phase 4 by adding asset system interfaces and a first `.pak` mount/list skeleton in `engine/Assets` and `tools/`.
 
 ## Suggested Commit Message
 
 ```text
-feat: add renderer abstraction and dx11 backend skeleton
+feat: add windowing and frame-loop skeleton contracts
 ```

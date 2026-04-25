@@ -29,6 +29,11 @@ int main() {
   cookie::core::Application app({
       .application_name = "CookieRuntime",
       .renderer_backend_name = renderer_config.backend_name,
+      .window_title = renderer_config.window_title,
+      .window_width = renderer_config.window_width,
+      .window_height = renderer_config.window_height,
+      .max_frames = renderer_config.max_frames,
+      .clear_color = renderer_config.clear_color,
   }, std::move(backend));
 
   return app.Run();

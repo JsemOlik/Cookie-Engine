@@ -10,6 +10,11 @@ namespace cookie::core {
 struct ApplicationConfig {
   std::string application_name;
   std::string renderer_backend_name;
+  std::string window_title;
+  int window_width = 1280;
+  int window_height = 720;
+  int max_frames = 0;
+  cookie::renderer::ClearColor clear_color{};
 };
 
 class Application {
