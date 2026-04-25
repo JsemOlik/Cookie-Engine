@@ -33,6 +33,12 @@ int Application::Run() const {
   logger.Info("CookieRuntime startup sequence initialized.");
   logger.Info("Application: " + config_.application_name);
   logger.Info("Selected renderer backend: " + config_.renderer_backend_name);
+  if (!config_.renderer_runtime_source.empty()) {
+    logger.Info("Renderer runtime source: " + config_.renderer_runtime_source);
+  }
+  if (!config_.renderer_module_path.empty()) {
+    logger.Info("Renderer module path: " + config_.renderer_module_path);
+  }
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));

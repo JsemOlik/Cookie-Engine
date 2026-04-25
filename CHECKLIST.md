@@ -76,6 +76,7 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added `EngineConfig` loader in core (`LoadEngineConfig`).
 - [x] Added `RendererDX11` shared module target (`RendererDX11.dll`) with exported create/destroy backend symbols.
 - [x] Updated runtime bootstrap to try dynamic renderer module loading using engine config, with static DX11 fallback.
+- [x] Added explicit startup logs for renderer runtime source (`module` vs `static-fallback`) and resolved module path.
 - [x] Added runtime dependency so `CookieRuntime` build also builds `cookie_renderer_dx11_module`.
 - [x] Updated export tool to copy module DLLs from runtime `bin/` to exported game `bin/`.
 
@@ -147,6 +148,8 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Run exported `<game-name>.exe` from export root and confirm `logs/latest.log` is created under exported `<game-name>/logs/` (not repository root logs).
 - [ ] Build and run `CookieRuntime`, then confirm renderer still initializes when `RendererDX11.dll` is present in runtime `bin/`.
 - [ ] Temporarily rename runtime `bin/RendererDX11.dll` and confirm runtime still starts via static fallback path.
+- [ ] Confirm runtime logs include `Renderer runtime source: module` when `RendererDX11.dll` is loaded.
+- [ ] Confirm runtime logs include `Renderer runtime source: static-fallback` when `RendererDX11.dll` is unavailable.
 - [ ] Run `CookieExportTool` and confirm exported `bin/RendererDX11.dll` exists.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 

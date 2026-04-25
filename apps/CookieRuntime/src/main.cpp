@@ -20,6 +20,12 @@ using RendererDestroyFn = void (*)(cookie::renderer::IRendererBackend*);
 constexpr const char* kCreateRendererSymbol = "CookieCreateRendererBackend";
 constexpr const char* kDestroyRendererSymbol = "CookieDestroyRendererBackend";
 
+struct RendererBootstrapResult {
+  std::unique_ptr<cookie::renderer::IRendererBackend> backend;
+  std::string runtime_source;
+  std::string module_path;
+};
+
 std::filesystem::path ResolveModulePath(
     const std::filesystem::path& root, const std::string& configured_path) {
   if (configured_path.empty()) {
@@ -114,29 +120,40 @@ std::unique_ptr<cookie::renderer::IRendererBackend> TryCreateRendererFromModule(
   return std::make_unique<DynamicRendererProxy>(module, backend, destroy_fn);
 }
 
-std::unique_ptr<cookie::renderer::IRendererBackend> CreateRendererBackend(
+RendererBootstrapResult CreateRendererBackend(
     const std::string& backend_name, const cookie::core::EngineConfig& engine_config,
     const cookie::core::StartupPaths& paths) {
   if (backend_name == "dx11") {
     const auto from_project_root =
         ResolveModulePath(paths.project_root, engine_config.renderer_dx11_module);
     if (auto module_backend = TryCreateRendererFromModule(from_project_root)) {
-      return module_backend;
+      return {
+          .backend = std::move(module_backend),
+          .runtime_source = "module",
+          .module_path = from_project_root.string(),
+      };
     }
 
     const auto from_runtime_dir = ResolveModulePath(
         cookie::platform::GetExecutableDirectory(),
         engine_config.renderer_dx11_module);
     if (auto module_backend = TryCreateRendererFromModule(from_runtime_dir)) {
-      return module_backend;
+      return {
+          .backend = std::move(module_backend),
+          .runtime_source = "module",
+          .module_path = from_runtime_dir.string(),
+      };
     }
 
     // Transitional fallback: keep static factory path available while module
     // boundaries are being migrated.
-    return cookie::renderer::dx11::CreateRendererDX11Backend();
+    return {
+        .backend = cookie::renderer::dx11::CreateRendererDX11Backend(),
+        .runtime_source = "static-fallback",
+    };
   }
 
-  return nullptr;
+  return {};
 }
 
 } // namespace
@@ -147,19 +164,21 @@ int main() {
       cookie::core::LoadEngineConfig(paths.engine_config);
   const cookie::renderer::RendererConfig renderer_config =
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
-  auto backend =
+  auto renderer_bootstrap =
       CreateRendererBackend(renderer_config.backend_name, engine_config, paths);
   auto physics_backend = cookie::physics::CreateJoltPhysicsBackend();
 
   cookie::core::Application app({
       .application_name = engine_config.runtime_name,
       .renderer_backend_name = renderer_config.backend_name,
+      .renderer_runtime_source = renderer_bootstrap.runtime_source,
+      .renderer_module_path = renderer_bootstrap.module_path,
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
-  }, std::move(physics_backend), std::move(backend));
+  }, std::move(physics_backend), std::move(renderer_bootstrap.backend));
 
   return app.Run();
 }

@@ -11,6 +11,8 @@ namespace cookie::core {
 struct ApplicationConfig {
   std::string application_name;
   std::string renderer_backend_name;
+  std::string renderer_runtime_source;
+  std::string renderer_module_path;
   std::string window_title;
   int window_width = 1280;
   int window_height = 720;
