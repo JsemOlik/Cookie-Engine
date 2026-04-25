@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 7 - Game Logic Module
+## Current Phase: Phase 8 - Packaging And Export
 
 Status: completed (skeleton scope)
 
@@ -64,6 +64,12 @@ Status: completed (skeleton scope)
 - [x] Added `game/GameLogic` shared library target with exported startup/update/shutdown functions.
 - [x] Wired runtime to attempt loading `GameLogic.dll` and call lifecycle hooks during frame loop.
 - [x] Updated runtime phase completion log to Phase 7 milestone text.
+- [x] Added `tools/CookieExportTool` CLI skeleton for exporting game folder layout.
+- [x] Wired `CookieExportTool` into `tools/CMakeLists.txt`.
+- [x] Added export flow to create `bin/`, `content/`, `config/`, and `logs/` folders.
+- [x] Added export copy behavior for runtime executable (`CookieRuntime.exe` to `<GameName>.exe`).
+- [x] Added export copy behavior for `GameLogic.dll` when present.
+- [x] Added export report output (`export_report.txt`) documenting warnings and future module placeholders.
 
 ## Not Started
 
@@ -76,7 +82,7 @@ Status: completed (skeleton scope)
 - [x] Jolt physics integration (skeleton boundary + header detection).
 - [x] Asset package format and `.pak` tooling (skeleton text format).
 - [x] Game logic module loading.
-- [ ] Exported game packaging.
+- [x] Exported game packaging (skeleton).
 - [ ] OpenGL backend.
 - [ ] Save support.
 - [ ] Mod support.
@@ -121,6 +127,15 @@ Status: completed (skeleton scope)
   - `Game logic startup completed.`
   - `Game logic shutdown completed.`
   - `Phase 7 skeleton complete. Game logic module contract wired.`
+- [ ] Build `CookieExportTool` and run:
+  - `CookieExportTool <project-root> <runtime-build-dir> <export-parent-dir> <game-name>`
+- [ ] Confirm export output contains:
+  - `<game-name>/<game-name>.exe`
+  - `<game-name>/bin/` (with `GameLogic.dll` when available)
+  - `<game-name>/content/` copied from project `content/`
+  - `<game-name>/config/` copied from project `config/`
+  - `<game-name>/logs/`
+  - `<game-name>/export_report.txt`
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
@@ -154,13 +169,15 @@ Status: completed (skeleton scope)
 - `build.bat` now attempts to bootstrap MSVC environment automatically via `VsDevCmd.bat`.
 - Phase 7 adds dynamic game module loading shape without introducing scripting/runtime reflection yet.
 - Runtime now probes for `GameLogic.dll` in `project_root/bin` and runtime output directory fallback.
+- Phase 8 adds an export CLI skeleton that assembles the game folder layout and copies available runtime artifacts.
+- Export currently reports future module placeholders (`Core.dll`, `RendererDX11.dll`, `Physics.dll`, `Audio.dll`) rather than producing those DLLs yet.
 
 ## Best Next Step
 
-Start Phase 8 by adding packaging/export skeleton for the structured game folder layout (no full packer pipeline yet).
+Start next phase planning for runtime module packaging details (shared engine DLL targets), then iterate export tool integration with editor workflows.
 
 ## Suggested Commit Message
 
 ```text
-feat: add game logic module loading skeleton
+feat: add export tool skeleton for game folder packaging
 ```

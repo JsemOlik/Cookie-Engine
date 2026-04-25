@@ -205,7 +205,7 @@ Add a separate game-code module shape.
 
 Milestone: runtime loads `GameLogic.dll`, calls a defined startup/update/shutdown contract, and keeps assets in `.pak` files.
 
-### [ ] Phase 8: Packaging And Export
+### [x] Phase 8: Packaging And Export
 
 Add export tooling for the structured game folder layout.
 

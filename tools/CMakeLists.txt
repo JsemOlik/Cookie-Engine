@@ -1,1 +1,2 @@
 add_subdirectory(CookiePakTool)
+add_subdirectory(CookieExportTool)
