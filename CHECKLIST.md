@@ -57,6 +57,7 @@ Status: completed (skeleton scope)
 - [x] Added `windeployqt` post-build deployment for `CookieEditor` on Windows.
 - [x] Updated `build.bat` to wait for Enter before closing so build output remains visible.
 - [x] Updated `build.bat` to auto-detect Ninja (PATH or Visual Studio bundled) and pass `CMAKE_MAKE_PROGRAM`.
+- [x] Updated `build.bat` to auto-load Visual Studio `VsDevCmd` when `cl.exe` is missing.
 
 ## Not Started
 
@@ -134,6 +135,7 @@ Status: completed (skeleton scope)
 - Runtime now uses compile-time repo root as first path-resolution candidate when working directory is outside source tree.
 - `build.bat` now pauses with `Press Enter to close...` on both success and failure paths.
 - `build.bat` now injects `-DCMAKE_MAKE_PROGRAM=<ninja-path>` during configure to avoid `CMAKE_MAKE_PROGRAM is not set`.
+- `build.bat` now attempts to bootstrap MSVC environment automatically via `VsDevCmd.bat`.
 
 ## Best Next Step
 

@@ -40,6 +40,34 @@ if errorlevel 1 (
   goto :end
 )
 
+where cl >nul 2>&1
+if errorlevel 1 (
+  set "VSDEVCMD_BAT="
+
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\18\Professional\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\18\Professional\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\18\Enterprise\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\18\Enterprise\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"
+
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\17\Community\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\17\Community\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\17\Professional\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\17\Professional\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\17\Enterprise\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\17\Enterprise\Common7\Tools\VsDevCmd.bat"
+  if not defined VSDEVCMD_BAT if exist "%ProgramFiles%\Microsoft Visual Studio\17\BuildTools\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD_BAT=%ProgramFiles%\Microsoft Visual Studio\17\BuildTools\Common7\Tools\VsDevCmd.bat"
+
+  if defined VSDEVCMD_BAT (
+    echo [INFO] Loading Visual Studio toolchain from: "%VSDEVCMD_BAT%"
+    call "%VSDEVCMD_BAT%" -host_arch=x64 -arch=x64 >nul
+  )
+)
+
+where cl >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] cl.exe was not found.
+  echo [INFO] Install MSVC Build Tools or run this script from a Visual Studio Developer Prompt.
+  set "EXIT_CODE=1"
+  goto :end
+)
+
 set "NINJA_EXE="
 for /f "delims=" %%I in ('where ninja 2^>nul') do (
   if not defined NINJA_EXE set "NINJA_EXE=%%I"
