@@ -50,6 +50,7 @@ Status: completed (skeleton scope)
 - [x] Added `qtbase` dependency to `vcpkg.json`.
 - [x] Added CMake gating so CookieEditor target is skipped cleanly when Qt6 Widgets is unavailable.
 - [x] Added `builtin-baseline` to `vcpkg.json` for compatibility with newer manifest-mode vcpkg.
+- [x] Repinned `builtin-baseline` to a real public microsoft/vcpkg commit (`52f5569...`) after rejecting bundled-tool hash.
 
 ## Not Started
 
