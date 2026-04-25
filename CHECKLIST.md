@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 1 - Core And Runtime Skeleton
+## Current Phase: Phase 2 - Renderer Abstraction And DX11 Skeleton
 
 Status: completed (skeleton scope)
 
@@ -19,13 +19,19 @@ Status: completed (skeleton scope)
 - [x] Added `engine/Core` skeleton with startup path discovery and file logger.
 - [x] Added `apps/CookieRuntime` executable skeleton wired through core/platform modules.
 - [x] Updated root CMake to build the new Phase 1 skeleton targets.
+- [x] Fixed project root discovery by walking up directories to repository markers.
+- [x] Added API-neutral renderer interfaces in `engine/Renderer`.
+- [x] Added renderer config loading from `config/graphics.json`.
+- [x] Added `modules/RendererDX11` backend skeleton (initialize/shutdown/name only, no DirectX calls).
+- [x] Wired `CookieRuntime` to select backend by config and run initialize/shutdown lifecycle.
+- [x] Added placeholder config files (`engine.json`, `graphics.json`, `input.cfg`, `game.json`).
 
 ## Not Started
 
 - [x] Runtime executable skeleton.
 - [ ] Cookie Editor Qt Widgets shell.
-- [ ] Renderer abstraction.
-- [ ] DirectX 11 renderer module skeleton.
+- [x] Renderer abstraction.
+- [x] DirectX 11 renderer module skeleton.
 - [ ] Jolt physics integration.
 - [ ] Asset package format and `.pak` tooling.
 - [ ] Game logic module loading.
@@ -40,8 +46,13 @@ Status: completed (skeleton scope)
 - [x] Confirm `vcpkg.json` is valid JSON and has an empty dependency list.
 - [ ] Configure and build `CookieRuntime` with Visual Studio/MSVC (`cl.exe`) using `x64-debug` preset.
 - [ ] Run `CookieRuntime` and confirm it creates `logs/latest.log`.
-- [ ] Confirm `logs/latest.log` contains startup lines for project root and config file paths.
-- [x] Confirm no renderer, physics, editor UI, asset packer, runtime loading modules, OpenGL, save, or mod implementation was added.
+- [ ] Confirm `logs/latest.log` contains repository-root `Project root` (not `out/build/...`) and config file paths under repository `config/`.
+- [ ] Confirm `logs/latest.log` contains renderer lifecycle lines:
+  - `Selected renderer backend: dx11`
+  - `Initializing renderer backend: dx11`
+  - `Renderer backend initialized successfully.`
+  - `Renderer backend shut down successfully.`
+- [x] Confirm no renderer drawing, physics, editor UI, asset packer, runtime module loading, OpenGL, save, or mod implementation was added.
 
 ## Verification Notes
 
@@ -50,13 +61,15 @@ Status: completed (skeleton scope)
 - `cmake --preset x64-debug` was attempted in this terminal, but `cl.exe` is not on `PATH` here, so compiler detection failed before generation.
 - The leftover empty `Cookie-Engine/` directory was removed.
 - Phase 1 skeleton code was added without introducing renderer/editor/physics implementations.
+- Phase 2 added renderer abstraction and DX11 backend skeleton only (no DirectX API usage yet).
+- Runtime backend selection currently reads `renderer` from `config/graphics.json` and defaults to `dx11` if the file is missing.
 
 ## Best Next Step
 
-Start Phase 2 by defining API-neutral renderer interfaces in `engine/Renderer` and creating a DX11 module skeleton in `modules/RendererDX11` without implementing full rendering yet.
+Start Phase 3 by adding platform window creation and a minimal renderer-facing frame loop contract, while still keeping DirectX implementation details inside `modules/RendererDX11`.
 
 ## Suggested Commit Message
 
 ```text
-feat: add core/platform/runtime phase-1 skeleton
+feat: add renderer abstraction and dx11 backend skeleton
 ```

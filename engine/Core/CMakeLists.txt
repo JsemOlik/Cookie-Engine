@@ -12,6 +12,7 @@ target_include_directories(cookie_core
 target_link_libraries(cookie_core
   PUBLIC
     cookie_platform
+    cookie_renderer
 )
 
 target_compile_features(cookie_core PUBLIC cxx_std_20)

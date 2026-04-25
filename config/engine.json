@@ -1,0 +1,4 @@
+{
+  "runtime": "CookieRuntime",
+  "log_file": "logs/latest.log"
+}
