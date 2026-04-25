@@ -2,6 +2,10 @@
 
 #include <memory>
 
+#ifndef COOKIE_HAS_JOLT_PACKAGE
+#define COOKIE_HAS_JOLT_PACKAGE 0
+#endif
+
 #if __has_include(<Jolt/Jolt.h>)
 #include <Jolt/Jolt.h>
 #define COOKIE_HAS_JOLT_HEADERS 1
@@ -29,7 +33,8 @@ class JoltPhysicsBackend final : public cookie::core::IPhysicsBackend {
     simulated_time_seconds_ += config.delta_time_seconds;
     return {
         .simulated_time_seconds = simulated_time_seconds_,
-        .using_jolt_headers = COOKIE_HAS_JOLT_HEADERS != 0,
+        .using_jolt_headers =
+            (COOKIE_HAS_JOLT_HEADERS != 0) && (COOKIE_HAS_JOLT_PACKAGE != 0),
     };
   }
 

@@ -43,6 +43,8 @@ Status: completed (skeleton scope)
 - [x] Added compile-time Jolt header detection (`__has_include(<Jolt/Jolt.h>)`) in physics backend.
 - [x] Wired runtime to initialize physics, run simulation steps in frame loop, and shut physics down.
 - [x] Added `joltphysics` dependency to `vcpkg.json` for this phase.
+- [x] Added optional `x64-debug-vcpkg` and `x64-release-vcpkg` presets for manifest/toolchain builds.
+- [x] Added physics-side CMake auto-link for common Jolt package targets when available.
 
 ## Not Started
 
@@ -81,7 +83,7 @@ Status: completed (skeleton scope)
 - [ ] Confirm runtime log includes:
   - `Initializing physics backend.`
   - `Physics backend initialized successfully.`
-  - `Physics backend using Jolt headers: true` (expected when vcpkg include paths are active)
+  - `Physics backend using Jolt headers: true` (expected when building with a vcpkg preset and Jolt target resolves)
   - `Physics backend shut down successfully.`
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -103,6 +105,7 @@ Status: completed (skeleton scope)
 - Runtime now attempts to mount `content/base.pak` and logs package/asset counts.
 - Phase 5 keeps physics API-neutral at core level and isolates backend implementation in `modules/Physics`.
 - Current physics step is deterministic skeleton logic, not full rigid-body simulation yet.
+- If runtime shows `Physics backend using Jolt headers: false`, build likely used non-vcpkg preset/toolchain.
 
 ## Best Next Step
 

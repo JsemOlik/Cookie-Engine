@@ -30,11 +30,29 @@
       }
     },
     {
+      "name": "x64-debug-vcpkg",
+      "displayName": "x64 Debug (vcpkg)",
+      "inherits": "x64-debug",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
       "name": "x64-release",
       "displayName": "x64 Release",
       "inherits": "x64-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-release-vcpkg",
+      "displayName": "x64 Release (vcpkg)",
+      "inherits": "x64-release",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
       }
     },
     {
@@ -68,6 +86,16 @@
       "name": "x64-release",
       "displayName": "x64 Release",
       "configurePreset": "x64-release"
+    },
+    {
+      "name": "x64-debug-vcpkg",
+      "displayName": "x64 Debug (vcpkg)",
+      "configurePreset": "x64-debug-vcpkg"
+    },
+    {
+      "name": "x64-release-vcpkg",
+      "displayName": "x64 Release (vcpkg)",
+      "configurePreset": "x64-release-vcpkg"
     },
     {
       "name": "x86-debug",
