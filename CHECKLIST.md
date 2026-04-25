@@ -168,11 +168,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Confirm runtime logs include `Physics runtime source: module` when `Physics.dll` is loaded.
 - [ ] Confirm runtime logs include `Physics runtime source: static-fallback` when `Physics.dll` is unavailable.
 - [ ] Run `CookieExportTool` and confirm exported `bin/Physics.dll` exists.
-- [ ] Build and run `CookieRuntime`, then confirm audio initializes when `Audio.dll` is present in runtime `bin/`.
-- [ ] Temporarily rename runtime `bin/Audio.dll` and confirm runtime still starts via static fallback path.
-- [ ] Confirm runtime logs include `Audio runtime source: module` when `Audio.dll` is loaded.
-- [ ] Confirm runtime logs include `Audio runtime source: static-fallback` when `Audio.dll` is unavailable.
-- [ ] Run `CookieExportTool` and confirm exported `bin/Audio.dll` exists.
+- [x] Build and run `CookieRuntime`, then confirm audio initializes when `Audio.dll` is present in runtime `bin/`.
+- [x] Temporarily rename runtime `bin/Audio.dll` and confirm runtime still starts via static fallback path.
+- [x] Confirm runtime logs include `Audio runtime source: module` when `Audio.dll` is loaded.
+- [x] Confirm runtime logs include `Audio runtime source: static-fallback` when `Audio.dll` is unavailable.
+- [x] Run `CookieExportTool` and confirm exported `bin/Audio.dll` exists.
 - [ ] If expected module DLLs are missing at export source, confirm `export_report.txt` contains warning lines.
 - [x] Confirm no real DirectX rendering code, physics, editor UI, full binary packer/export pipeline, OpenGL, save, or mod implementation was added.
 
@@ -217,6 +217,8 @@ Status: completed (skeleton scope, pending local build verification)
 - Runtime now supports manifest-driven physics module path in `engine.json`.
 - `modules/Audio` now builds both static fallback library and shared module DLL for runtime loading transition.
 - Runtime now supports manifest-driven audio module path in `engine.json`.
+- Audio module loading and fallback were validated in local runtime logs (`module` with DLL present, `static-fallback` after rename).
+- Exported `MyGame.exe` was validated with `RendererDX11.dll`, `Physics.dll`, and `Audio.dll` all loading from exported `bin/`.
 
 ## Best Next Step
 
