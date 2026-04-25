@@ -56,6 +56,7 @@ Status: completed (skeleton scope)
 - [x] Added compile-time source-root fallback so runtime resolves `config/` and `content/` correctly from short build directories.
 - [x] Added `windeployqt` post-build deployment for `CookieEditor` on Windows.
 - [x] Updated `build.bat` to wait for Enter before closing so build output remains visible.
+- [x] Updated `build.bat` to auto-detect Ninja (PATH or Visual Studio bundled) and pass `CMAKE_MAKE_PROGRAM`.
 
 ## Not Started
 
@@ -132,6 +133,7 @@ Status: completed (skeleton scope)
 - vcpkg presets now use `C:\ce-build\...` and `C:\ce-install\...` for shorter Windows paths.
 - Runtime now uses compile-time repo root as first path-resolution candidate when working directory is outside source tree.
 - `build.bat` now pauses with `Press Enter to close...` on both success and failure paths.
+- `build.bat` now injects `-DCMAKE_MAKE_PROGRAM=<ninja-path>` during configure to avoid `CMAKE_MAKE_PROGRAM is not set`.
 
 ## Best Next Step
 

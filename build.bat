@@ -40,16 +40,41 @@ if errorlevel 1 (
   goto :end
 )
 
+set "NINJA_EXE="
+for /f "delims=" %%I in ('where ninja 2^>nul') do (
+  if not defined NINJA_EXE set "NINJA_EXE=%%I"
+)
+
+if not defined NINJA_EXE (
+  if exist "%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" (
+    set "NINJA_EXE=%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+  )
+)
+
+if not defined NINJA_EXE (
+  if exist "%ProgramFiles%\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" (
+    set "NINJA_EXE=%ProgramFiles%\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+  )
+)
+
+if not defined NINJA_EXE (
+  echo [ERROR] Ninja was not found.
+  echo [INFO] Install Ninja or use a Visual Studio Developer Command Prompt.
+  set "EXIT_CODE=1"
+  goto :end
+)
+
 echo [INFO] Project root: "%cd%"
 echo [INFO] Using preset: %PRESET%
 echo [INFO] Using VCPKG_ROOT: "%VCPKG_ROOT%"
+echo [INFO] Using Ninja: "%NINJA_EXE%"
 echo [INFO] Cleaning previous build artifacts...
 
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 if exist "%INSTALL_DIR%" rmdir /s /q "%INSTALL_DIR%"
 
 echo [INFO] Configuring...
-cmake --preset "%PRESET%" --fresh
+cmake --preset "%PRESET%" --fresh -DCMAKE_MAKE_PROGRAM="%NINJA_EXE%"
 if errorlevel 1 (
   echo [ERROR] Configure failed.
   set "EXIT_CODE=1"
