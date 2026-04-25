@@ -145,6 +145,8 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added cube primitive helpers (`MakeColoredCubeVertices`, `MakeCubeTriangleIndices`).
 - [x] Updated DX11 backend with index-buffer drawing path and depth buffer/depth-stencil usage.
 - [x] Updated runtime demo scene to render indexed cubes instead of non-indexed triangles.
+- [x] Added minimal GLB mesh loader in assets module for first-mesh/first-primitive test loading.
+- [x] Wired runtime to load `content/models/test_mesh.glb` and render it as indexed geometry, with cube fallback if load fails.
 - [x] Removed `max_frames` from graphics/runtime config and removed frame-count auto-shutdown logic.
 - [x] Updated runtime phase milestone log to Phase 23 completion text.
 
@@ -270,6 +272,8 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm indexed cube geometry is visible (not just flat 2D triangle output).
 - [ ] Confirm runtime and exported game logs now end with `Phase 23 complete. Indexed cube render path wired.`.
 - [ ] Confirm there is no `max_frames` setting in `config/graphics.json` and runtime no longer auto-closes by frame count.
+- [ ] Place `content/models/test_mesh.glb`, run runtime, and confirm GLB load log lines appear with vertex/index counts.
+- [ ] Confirm runtime falls back to cube geometry with a clear log reason if GLB loading fails.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -329,7 +333,7 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 20 now uses renderer-owned camera projection math for runtime scene submission and validates multi-instance world-space rendering.
 - Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
 - Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
-- Phase 23 now introduces indexed/depth-tested cube rendering and removes automatic frame-count shutdown behavior.
+- Phase 23 now introduces indexed/depth-tested geometry rendering, adds a minimal GLB test-mesh path, and removes automatic frame-count shutdown behavior.
 
 ## Best Next Step
 

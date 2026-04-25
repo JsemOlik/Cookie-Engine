@@ -297,9 +297,9 @@ Milestone: runtime composes `view * projection` from config-driven camera settin
 
 ### [x] Phase 23: Indexed Cube Rendering And Persistent Runtime Loop
 
-Add indexed mesh support to renderer scene contracts and DX11 backend draw path, then render the first cube primitives while removing frame-count-based auto-shutdown from runtime.
+Add indexed mesh support to renderer scene contracts and DX11 backend draw path, then render the first cube primitives plus a test-model GLB path while removing frame-count-based auto-shutdown from runtime.
 
-Milestone: runtime renders indexed cube geometry (depth-tested) and remains open until user closes the window.
+Milestone: runtime renders indexed/depth-tested geometry (generated cube or loaded test GLB) and remains open until user closes the window.
 
 ### [ ] Future Phases
 

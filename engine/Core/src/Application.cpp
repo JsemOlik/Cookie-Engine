@@ -1,15 +1,20 @@
 #include "Cookie/Core/Application.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/GameLogicModule.h"
 #include "Cookie/Core/Logger.h"
 #include "Cookie/Assets/AssetRegistry.h"
+#include "Cookie/Assets/GlbMeshLoader.h"
 #include "Cookie/Platform/PlatformPaths.h"
 #include "Cookie/Platform/PlatformWindow.h"
 #include "Cookie/Renderer/Primitives.h"
@@ -219,6 +224,75 @@ int Application::Run() const {
   cookie::renderer::SceneBuilder scene_builder;
   const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices(0.5f);
   const auto cube_indices = cookie::renderer::MakeCubeTriangleIndices();
+  std::vector<cookie::renderer::SceneVertex> loaded_vertices;
+  std::vector<std::uint32_t> loaded_indices;
+  bool using_loaded_glb = false;
+  {
+    const auto glb_path = paths.project_root / "content" / "models" / "test_mesh.glb";
+    cookie::assets::GlbMeshData glb_mesh;
+    std::string glb_error;
+    if (cookie::assets::LoadFirstMeshFromGlb(glb_path, glb_mesh, &glb_error) &&
+        !glb_mesh.positions_xyz.empty()) {
+      const std::size_t vertex_count = glb_mesh.positions_xyz.size() / 3;
+      loaded_vertices.resize(vertex_count);
+      float min_x = std::numeric_limits<float>::max();
+      float min_y = std::numeric_limits<float>::max();
+      float min_z = std::numeric_limits<float>::max();
+      float max_x = std::numeric_limits<float>::lowest();
+      float max_y = std::numeric_limits<float>::lowest();
+      float max_z = std::numeric_limits<float>::lowest();
+      for (std::size_t i = 0; i < vertex_count; ++i) {
+        const float x = glb_mesh.positions_xyz[i * 3 + 0];
+        const float y = glb_mesh.positions_xyz[i * 3 + 1];
+        const float z = glb_mesh.positions_xyz[i * 3 + 2];
+        min_x = std::min(min_x, x);
+        min_y = std::min(min_y, y);
+        min_z = std::min(min_z, z);
+        max_x = std::max(max_x, x);
+        max_y = std::max(max_y, y);
+        max_z = std::max(max_z, z);
+      }
+      const float center_x = (min_x + max_x) * 0.5f;
+      const float center_y = (min_y + max_y) * 0.5f;
+      const float center_z = (min_z + max_z) * 0.5f;
+      const float extent_x = max_x - min_x;
+      const float extent_y = max_y - min_y;
+      const float extent_z = max_z - min_z;
+      const float max_extent = std::max(extent_x, std::max(extent_y, extent_z));
+      const float normalizer = (max_extent > 0.00001f) ? (1.6f / max_extent) : 1.0f;
+      for (std::size_t i = 0; i < vertex_count; ++i) {
+        const float x = (glb_mesh.positions_xyz[i * 3 + 0] - center_x) * normalizer;
+        const float y = (glb_mesh.positions_xyz[i * 3 + 1] - center_y) * normalizer;
+        const float z = (glb_mesh.positions_xyz[i * 3 + 2] - center_z) * normalizer;
+        loaded_vertices[i].position[0] = x;
+        loaded_vertices[i].position[1] = y;
+        loaded_vertices[i].position[2] = z;
+        loaded_vertices[i].color[0] = 0.35f + std::abs(x) * 0.65f;
+        loaded_vertices[i].color[1] = 0.35f + std::abs(y) * 0.65f;
+        loaded_vertices[i].color[2] = 0.35f + std::abs(z) * 0.65f;
+        loaded_vertices[i].color[3] = 1.0f;
+      }
+
+      loaded_indices = glb_mesh.indices;
+      if (loaded_indices.empty()) {
+        loaded_indices.resize(vertex_count);
+        for (std::size_t i = 0; i < vertex_count; ++i) {
+          loaded_indices[i] = static_cast<std::uint32_t>(i);
+        }
+      }
+
+      using_loaded_glb = true;
+      logger.Info("Loaded GLB mesh: " + glb_path.string());
+      logger.Info("GLB mesh stats - vertices: " +
+                  std::to_string(loaded_vertices.size()) +
+                  ", indices: " + std::to_string(loaded_indices.size()));
+    } else {
+      logger.Info("GLB mesh not loaded: " + glb_path.string());
+      if (!glb_error.empty()) {
+        logger.Info("GLB load reason: " + glb_error);
+      }
+    }
+  }
   const float aspect_ratio =
       (config_.window_height > 0)
           ? static_cast<float>(config_.window_width) /
@@ -263,26 +337,39 @@ int Application::Run() const {
     const auto view = cookie::renderer::MakeLookAtView(
         camera_x, camera_y, camera_z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     scene_builder.Reset(cookie::renderer::MultiplyTransforms(view, view_projection));
-    const auto left_cube_model =
-        cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, -0.25f),
-            cookie::renderer::MultiplyTransforms(
-                cookie::renderer::MakeZRotationTransform(
-                    static_cast<float>(frame_count) * 0.01f),
-                cookie::renderer::MakeScaleTransform(0.8f, 0.8f, 1.0f)));
-    const auto right_cube_model =
-        cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.35f),
-            cookie::renderer::MultiplyTransforms(
-                cookie::renderer::MakeZRotationTransform(
-                    static_cast<float>(frame_count) * -0.015f),
-                cookie::renderer::MakeScaleTransform(0.5f, 0.5f, 1.0f)));
-    scene_builder.AddIndexedMeshInstance(
-        cube_vertices.data(), cube_vertices.size(),
-        cube_indices.data(), cube_indices.size(), left_cube_model);
-    scene_builder.AddIndexedMeshInstance(
-        cube_vertices.data(), cube_vertices.size(),
-        cube_indices.data(), cube_indices.size(), right_cube_model);
+    if (using_loaded_glb) {
+      const auto glb_model =
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeTranslationTransform(0.0f, 0.0f, 0.0f),
+              cookie::renderer::MultiplyTransforms(
+                  cookie::renderer::MakeZRotationTransform(
+                      static_cast<float>(frame_count) * 0.0125f),
+                  cookie::renderer::MakeScaleTransform(1.0f, 1.0f, 1.0f)));
+      scene_builder.AddIndexedMeshInstance(
+          loaded_vertices.data(), loaded_vertices.size(), loaded_indices.data(),
+          loaded_indices.size(), glb_model);
+    } else {
+      const auto left_cube_model =
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeTranslationTransform(-0.7f, 0.0f, -0.25f),
+              cookie::renderer::MultiplyTransforms(
+                  cookie::renderer::MakeZRotationTransform(
+                      static_cast<float>(frame_count) * 0.01f),
+                  cookie::renderer::MakeScaleTransform(0.8f, 0.8f, 1.0f)));
+      const auto right_cube_model =
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeTranslationTransform(0.75f, 0.0f, 0.35f),
+              cookie::renderer::MultiplyTransforms(
+                  cookie::renderer::MakeZRotationTransform(
+                      static_cast<float>(frame_count) * -0.015f),
+                  cookie::renderer::MakeScaleTransform(0.5f, 0.5f, 1.0f)));
+      scene_builder.AddIndexedMeshInstance(
+          cube_vertices.data(), cube_vertices.size(),
+          cube_indices.data(), cube_indices.size(), left_cube_model);
+      scene_builder.AddIndexedMeshInstance(
+          cube_vertices.data(), cube_vertices.size(),
+          cube_indices.data(), cube_indices.size(), right_cube_model);
+    }
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
