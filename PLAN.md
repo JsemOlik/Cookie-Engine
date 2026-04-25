@@ -259,6 +259,12 @@ Replace the DX11 placeholder renderer behavior with a real D3D11 startup path (d
 
 Milestone: runtime window is cleared/presented by DX11 backend each frame, with no DirectX types leaked into core engine interfaces.
 
+### [x] Phase 17: DX11 Minimal Triangle Pipeline
+
+Build the first end-to-end draw path in the DX11 backend: create shaders, input layout, vertex buffer, and issue a basic triangle draw call each frame.
+
+Milestone: runtime displays a colored test triangle over the clear color using the renderer module path and existing runtime/editor boundaries.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

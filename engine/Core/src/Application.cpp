@@ -255,7 +255,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 16 complete. DX11 device/swapchain clear-present path wired.");
+  logger.Info("Phase 17 complete. DX11 minimal triangle pipeline wired.");
 
   return 0;
 }

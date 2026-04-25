@@ -17,6 +17,7 @@ if(WIN32)
     PUBLIC
       d3d11
       dxgi
+      d3dcompiler
   )
 endif()
 
@@ -42,6 +43,7 @@ if(WIN32)
     PUBLIC
       d3d11
       dxgi
+      d3dcompiler
   )
 endif()
 

@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 16 - DX11 Real Clear/Present Bootstrap
+## Current Phase: Phase 17 - DX11 Minimal Triangle Pipeline
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -114,6 +114,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Reordered runtime startup so platform window is created before renderer initialization.
 - [x] Implemented real DirectX 11 renderer bootstrap in `RendererDX11` (device, swap chain, render-target view, clear, present).
 - [x] Added DX11 system library linkage (`d3d11`, `dxgi`) for renderer static/module targets.
+- [x] Added DX11 shader compilation and minimal graphics pipeline setup in `RendererDX11` (vertex shader, pixel shader, input layout, vertex buffer).
+- [x] Added first per-frame draw call (`Draw(3, 0)`) for a test triangle over the clear color.
+- [x] Added `d3dcompiler` linkage for DX11 shader compilation path.
 
 ## Not Started
 
@@ -217,6 +220,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm the runtime window is no longer white (it should clear to `graphics.json` `clear_color` via DX11 each frame).
 - [ ] Confirm runtime startup still logs `Renderer runtime source` (`module` or `static-fallback`) correctly after DX11 bootstrap changes.
 - [ ] Confirm `MyGame.exe` in exported folder shows the same DX11 clear/present behavior and still honors strict module-mode rules.
+- [ ] Build and run `CookieRuntime` and confirm a colored test triangle renders over the clear color.
+- [ ] Confirm triangle path works when `RendererDX11.dll` is loaded as module and not only static fallback.
+- [ ] Export with `CookieExportTool`, run `MyGame.exe`, and confirm triangle rendering in exported runtime too.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -270,13 +276,14 @@ Status: completed (skeleton scope, pending local build verification)
 - `ship.bat` now provides a repeatable release-oriented ship candidate flow with integrated integrity + strict-mode validation checks.
 - Phase 16 now passes native window handle + size through API-neutral renderer init info instead of exposing backend types in core.
 - `RendererDX11` now owns real D3D11 frame presentation lifecycle (CreateDeviceAndSwapChain, RTV clear, Present).
+- Phase 17 now adds the first true draw pipeline in DX11 (shader compile, vertex layout, vertex buffer, triangle draw).
 
 ## Best Next Step
 
-Phase 17: add a minimal triangle pipeline in `RendererDX11` (shader compile/load, input layout, vertex buffer, draw call) while keeping runtime/editor/module boundaries unchanged.
+Phase 18: introduce basic render-scene contracts (per-frame constants and a tiny camera transform path) so runtime can move from hardcoded triangle data toward engine-driven draw inputs.
 
 ## Suggested Commit Message
 
 ```text
-feat: bootstrap real DX11 clear/present render path
+feat: add dx11 minimal triangle render pipeline
 ```
