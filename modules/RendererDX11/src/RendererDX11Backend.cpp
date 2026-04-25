@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <string_view>
 
@@ -26,11 +27,6 @@ namespace {
 
 class RendererDX11Backend final : public IRendererBackend {
  public:
-  struct Vertex {
-    float position[3];
-    float color[4];
-  };
-
 #if defined(_WIN32)
   bool Initialize(const RendererInitInfo& init_info) override {
     const auto hwnd = static_cast<HWND>(init_info.native_window_handle);
@@ -126,13 +122,14 @@ class RendererDX11Backend final : public IRendererBackend {
     viewport.MaxDepth = 1.0f;
     device_context_->RSSetViewports(1, &viewport);
 
-    if (!CreateTrianglePipeline()) {
+    if (!CreateScenePipeline()) {
       Shutdown();
       return false;
     }
 
     vsync_enabled_ = init_info.enable_vsync;
     initialized_ = true;
+    submitted_scene_ = {};
     return true;
   }
 #else
@@ -163,12 +160,20 @@ class RendererDX11Backend final : public IRendererBackend {
 #endif
   }
 
+  void SubmitScene(const RenderScene& scene) override {
+#if defined(_WIN32)
+    submitted_scene_ = scene;
+#else
+    (void)scene;
+#endif
+  }
+
   void EndFrame() override {
 #if defined(_WIN32)
     if (!initialized_ || swap_chain_ == nullptr) {
       return;
     }
-    DrawTestTriangle();
+    DrawSubmittedScene();
     const UINT sync_interval = vsync_enabled_ ? 1u : 0u;
     swap_chain_->Present(sync_interval, 0);
 #endif
@@ -176,9 +181,15 @@ class RendererDX11Backend final : public IRendererBackend {
 
   void Shutdown() override {
 #if defined(_WIN32)
+    submitted_scene_ = {};
     if (vertex_buffer_ != nullptr) {
       vertex_buffer_->Release();
       vertex_buffer_ = nullptr;
+    }
+    vertex_buffer_capacity_bytes_ = 0;
+    if (scene_constant_buffer_ != nullptr) {
+      scene_constant_buffer_->Release();
+      scene_constant_buffer_ = nullptr;
     }
     if (input_layout_ != nullptr) {
       input_layout_->Release();
@@ -210,7 +221,6 @@ class RendererDX11Backend final : public IRendererBackend {
     }
 #endif
     initialized_ = false;
-    triangle_ready_ = false;
   }
 
   std::string_view Name() const override {
@@ -219,6 +229,11 @@ class RendererDX11Backend final : public IRendererBackend {
 
  private:
 #if defined(_WIN32)
+  struct SceneConstantData {
+    float model[16];
+    float view_projection[16];
+  };
+
   bool CompileShader(const char* source, const char* entry_point,
                      const char* target, ID3DBlob** out_blob) {
     if (source == nullptr || entry_point == nullptr || target == nullptr ||
@@ -233,7 +248,7 @@ class RendererDX11Backend final : public IRendererBackend {
 
     ID3DBlob* error_blob = nullptr;
     const HRESULT result = D3DCompile(
-        source, strlen(source), nullptr, nullptr, nullptr, entry_point, target,
+        source, std::strlen(source), nullptr, nullptr, nullptr, entry_point, target,
         compile_flags, 0, out_blob, &error_blob);
     if (error_blob != nullptr) {
       error_blob->Release();
@@ -242,12 +257,17 @@ class RendererDX11Backend final : public IRendererBackend {
     return SUCCEEDED(result) && *out_blob != nullptr;
   }
 
-  bool CreateTrianglePipeline() {
+  bool CreateScenePipeline() {
     if (device_ == nullptr) {
       return false;
     }
 
     constexpr const char* vertex_shader_source = R"(
+cbuffer SceneConstants : register(b0) {
+  float4x4 u_model;
+  float4x4 u_view_projection;
+};
+
 struct VSIn {
   float3 position : POSITION;
   float4 color : COLOR;
@@ -260,7 +280,8 @@ struct PSIn {
 
 PSIn VSMain(VSIn input) {
   PSIn output;
-  output.position = float4(input.position, 1.0f);
+  float4 world_position = mul(float4(input.position, 1.0f), u_model);
+  output.position = mul(world_position, u_view_projection);
   output.color = input.color;
   return output;
 }
@@ -278,7 +299,6 @@ float4 PSMain(PSIn input) : SV_Target {
 )";
 
     ID3DBlob* vertex_shader_blob = nullptr;
-    ID3DBlob* pixel_shader_blob = nullptr;
     if (!CompileShader(vertex_shader_source, "VSMain", "vs_5_0",
                        &vertex_shader_blob)) {
       return false;
@@ -294,10 +314,10 @@ float4 PSMain(PSIn input) : SV_Target {
 
     const D3D11_INPUT_ELEMENT_DESC input_layout_desc[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-         static_cast<UINT>(offsetof(Vertex, position)),
+         static_cast<UINT>(offsetof(SceneVertex, position)),
          D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
-         static_cast<UINT>(offsetof(Vertex, color)),
+         static_cast<UINT>(offsetof(SceneVertex, color)),
          D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     const HRESULT input_layout_result = device_->CreateInputLayout(
@@ -309,6 +329,7 @@ float4 PSMain(PSIn input) : SV_Target {
       return false;
     }
 
+    ID3DBlob* pixel_shader_blob = nullptr;
     if (!CompileShader(pixel_shader_source, "PSMain", "ps_5_0",
                        &pixel_shader_blob)) {
       vertex_shader_blob->Release();
@@ -325,54 +346,121 @@ float4 PSMain(PSIn input) : SV_Target {
       return false;
     }
 
-    const Vertex vertices[] = {
-        {{0.0f, 0.55f, 0.0f}, {1.0f, 0.2f, 0.2f, 1.0f}},
-        {{0.55f, -0.45f, 0.0f}, {0.2f, 1.0f, 0.2f, 1.0f}},
-        {{-0.55f, -0.45f, 0.0f}, {0.2f, 0.4f, 1.0f, 1.0f}},
-    };
+    D3D11_BUFFER_DESC scene_constant_desc{};
+    scene_constant_desc.Usage = D3D11_USAGE_DYNAMIC;
+    scene_constant_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    scene_constant_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    scene_constant_desc.ByteWidth = static_cast<UINT>(sizeof(SceneConstantData));
 
-    D3D11_BUFFER_DESC vertex_buffer_desc{};
-    vertex_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-    vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    vertex_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(vertices));
-
-    D3D11_SUBRESOURCE_DATA vertex_data{};
-    vertex_data.pSysMem = vertices;
-
-    const HRESULT buffer_result = device_->CreateBuffer(
-        &vertex_buffer_desc, &vertex_data, &vertex_buffer_);
+    const HRESULT constant_result =
+        device_->CreateBuffer(&scene_constant_desc, nullptr, &scene_constant_buffer_);
     vertex_shader_blob->Release();
     vertex_shader_blob = nullptr;
-    if (FAILED(buffer_result) || vertex_buffer_ == nullptr) {
+    if (FAILED(constant_result) || scene_constant_buffer_ == nullptr) {
       return false;
     }
 
-    triangle_ready_ = true;
     return true;
   }
 
-  void DrawTestTriangle() {
-    if (!triangle_ready_ || device_context_ == nullptr || vertex_buffer_ == nullptr ||
+  bool EnsureVertexBufferCapacity(std::size_t required_bytes) {
+    if (required_bytes == 0 || required_bytes > static_cast<std::size_t>(UINT_MAX)) {
+      return false;
+    }
+    if (vertex_buffer_ != nullptr && required_bytes <= vertex_buffer_capacity_bytes_) {
+      return true;
+    }
+
+    if (vertex_buffer_ != nullptr) {
+      vertex_buffer_->Release();
+      vertex_buffer_ = nullptr;
+      vertex_buffer_capacity_bytes_ = 0;
+    }
+
+    D3D11_BUFFER_DESC vertex_buffer_desc{};
+    vertex_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+    vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vertex_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    vertex_buffer_desc.ByteWidth = static_cast<UINT>(required_bytes);
+
+    const HRESULT result =
+        device_->CreateBuffer(&vertex_buffer_desc, nullptr, &vertex_buffer_);
+    if (FAILED(result) || vertex_buffer_ == nullptr) {
+      return false;
+    }
+
+    vertex_buffer_capacity_bytes_ = required_bytes;
+    return true;
+  }
+
+  void CopyMatrix16(float* destination, const Float4x4& source) {
+    std::memcpy(destination, source.m, sizeof(source.m));
+  }
+
+  void DrawSubmittedScene() {
+    if (!initialized_ || device_context_ == nullptr || input_layout_ == nullptr ||
         vertex_shader_ == nullptr || pixel_shader_ == nullptr ||
-        input_layout_ == nullptr) {
+        scene_constant_buffer_ == nullptr) {
+      return;
+    }
+    if (submitted_scene_.instances == nullptr || submitted_scene_.instance_count == 0) {
       return;
     }
 
-    const UINT stride = sizeof(Vertex);
+    for (std::size_t index = 0; index < submitted_scene_.instance_count; ++index) {
+      DrawSceneInstance(submitted_scene_.instances[index], submitted_scene_.camera);
+    }
+  }
+
+  void DrawSceneInstance(const RenderMeshInstance& instance, const RenderCamera& camera) {
+    if (instance.vertices == nullptr || instance.vertex_count < 3 ||
+        instance.vertex_count > static_cast<std::size_t>(UINT_MAX)) {
+      return;
+    }
+
+    const std::size_t required_bytes = instance.vertex_count * sizeof(SceneVertex);
+    if (!EnsureVertexBufferCapacity(required_bytes)) {
+      return;
+    }
+
+    D3D11_MAPPED_SUBRESOURCE mapped_vertex_buffer{};
+    const HRESULT map_result = device_context_->Map(
+        vertex_buffer_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_vertex_buffer);
+    if (FAILED(map_result) || mapped_vertex_buffer.pData == nullptr) {
+      return;
+    }
+    std::memcpy(mapped_vertex_buffer.pData, instance.vertices, required_bytes);
+    device_context_->Unmap(vertex_buffer_, 0);
+
+    SceneConstantData constants{};
+    CopyMatrix16(constants.model, instance.model_transform);
+    CopyMatrix16(constants.view_projection, camera.view_projection);
+
+    D3D11_MAPPED_SUBRESOURCE mapped_constants{};
+    const HRESULT constant_map_result = device_context_->Map(
+        scene_constant_buffer_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_constants);
+    if (FAILED(constant_map_result) || mapped_constants.pData == nullptr) {
+      return;
+    }
+    std::memcpy(mapped_constants.pData, &constants, sizeof(constants));
+    device_context_->Unmap(scene_constant_buffer_, 0);
+
+    const UINT stride = sizeof(SceneVertex);
     const UINT offset = 0;
     device_context_->IASetInputLayout(input_layout_);
     device_context_->IASetVertexBuffers(0, 1, &vertex_buffer_, &stride, &offset);
     device_context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     device_context_->VSSetShader(vertex_shader_, nullptr, 0);
+    device_context_->VSSetConstantBuffers(0, 1, &scene_constant_buffer_);
     device_context_->PSSetShader(pixel_shader_, nullptr, 0);
-    device_context_->Draw(3, 0);
+    device_context_->Draw(static_cast<UINT>(instance.vertex_count), 0);
   }
 #endif
 
   bool initialized_ = false;
 #if defined(_WIN32)
   bool vsync_enabled_ = true;
-  bool triangle_ready_ = false;
+  RenderScene submitted_scene_{};
   ID3D11Device* device_ = nullptr;
   ID3D11DeviceContext* device_context_ = nullptr;
   IDXGISwapChain* swap_chain_ = nullptr;
@@ -380,7 +468,9 @@ float4 PSMain(PSIn input) : SV_Target {
   ID3D11VertexShader* vertex_shader_ = nullptr;
   ID3D11PixelShader* pixel_shader_ = nullptr;
   ID3D11InputLayout* input_layout_ = nullptr;
+  ID3D11Buffer* scene_constant_buffer_ = nullptr;
   ID3D11Buffer* vertex_buffer_ = nullptr;
+  std::size_t vertex_buffer_capacity_bytes_ = 0;
 #endif
 };
 

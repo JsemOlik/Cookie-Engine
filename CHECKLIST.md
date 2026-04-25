@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 17 - DX11 Minimal Triangle Pipeline
+## Current Phase: Phase 18 - Engine-Driven Scene Submission
 
 Status: completed (skeleton scope, pending local build verification)
 
@@ -117,6 +117,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Added DX11 shader compilation and minimal graphics pipeline setup in `RendererDX11` (vertex shader, pixel shader, input layout, vertex buffer).
 - [x] Added first per-frame draw call (`Draw(3, 0)`) for a test triangle over the clear color.
 - [x] Added `d3dcompiler` linkage for DX11 shader compilation path.
+- [x] Added API-neutral scene contracts in renderer interfaces (`RenderScene`, `RenderCamera`, `RenderMeshInstance`, `SceneVertex`, `Float4x4`).
+- [x] Added `IRendererBackend::SubmitScene(...)` and updated runtime dynamic renderer proxy forwarding.
+- [x] Updated runtime frame loop to submit camera + mesh instance data each frame through renderer abstraction.
+- [x] Updated DX11 backend to render submitted scene instances (dynamic vertex upload + per-instance constant buffer transforms).
+- [x] Updated runtime phase milestone log to Phase 18 completion text.
 
 ## Not Started
 
@@ -223,6 +228,9 @@ Status: completed (skeleton scope, pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm a colored test triangle renders over the clear color.
 - [ ] Confirm triangle path works when `RendererDX11.dll` is loaded as module and not only static fallback.
 - [ ] Export with `CookieExportTool`, run `MyGame.exe`, and confirm triangle rendering in exported runtime too.
+- [ ] Build and run `CookieRuntime` and confirm submitted scene still renders after removing hardcoded DX11 geometry path.
+- [ ] Confirm triangle rotates over time (runtime-driven model transform) while renderer remains backend-agnostic at interface boundary.
+- [ ] Confirm runtime and exported game logs now end with `Phase 18 complete. Engine-driven render scene contract wired.`.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
 
 ## Verification Notes
@@ -277,13 +285,14 @@ Status: completed (skeleton scope, pending local build verification)
 - Phase 16 now passes native window handle + size through API-neutral renderer init info instead of exposing backend types in core.
 - `RendererDX11` now owns real D3D11 frame presentation lifecycle (CreateDeviceAndSwapChain, RTV clear, Present).
 - Phase 17 now adds the first true draw pipeline in DX11 (shader compile, vertex layout, vertex buffer, triangle draw).
+- Phase 18 now routes render data through engine-owned scene contracts and submits per-frame camera/instance transforms to DX11.
 
 ## Best Next Step
 
-Phase 18: introduce basic render-scene contracts (per-frame constants and a tiny camera transform path) so runtime can move from hardcoded triangle data toward engine-driven draw inputs.
+Phase 19: move scene submission out of hardcoded runtime arrays into a small renderer-facing scene builder layer in `engine/Renderer` (reusable mesh primitives + transform utilities), then feed runtime and future editor viewport through the same path.
 
 ## Suggested Commit Message
 
 ```text
-feat: add dx11 minimal triangle render pipeline
+feat: add engine-driven scene submission for dx11 rendering
 ```

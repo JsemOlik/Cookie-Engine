@@ -145,6 +145,12 @@ class DynamicRendererProxy final : public cookie::renderer::IRendererBackend {
     }
   }
 
+  void SubmitScene(const cookie::renderer::RenderScene& scene) override {
+    if (backend_) {
+      backend_->SubmitScene(scene);
+    }
+  }
+
   void EndFrame() override {
     if (backend_) {
       backend_->EndFrame();

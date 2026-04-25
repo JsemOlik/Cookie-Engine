@@ -265,6 +265,12 @@ Build the first end-to-end draw path in the DX11 backend: create shaders, input 
 
 Milestone: runtime displays a colored test triangle over the clear color using the renderer module path and existing runtime/editor boundaries.
 
+### [x] Phase 18: Engine-Driven Scene Submission
+
+Introduce API-neutral scene submission contracts in renderer interfaces and drive DX11 drawing from runtime-provided scene data (camera + mesh instances), instead of backend hardcoded triangle data.
+
+Milestone: runtime submits scene/camera/instance data each frame through renderer abstraction, and DX11 renders that submitted scene with per-instance transforms.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.

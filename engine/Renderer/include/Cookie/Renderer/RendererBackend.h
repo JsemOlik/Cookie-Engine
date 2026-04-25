@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 
 namespace cookie::renderer {
@@ -18,6 +19,36 @@ struct RendererInitInfo {
   bool enable_vsync = true;
 };
 
+struct Float4x4 {
+  float m[16] = {
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+  };
+};
+
+struct SceneVertex {
+  float position[3] = {0.0f, 0.0f, 0.0f};
+  float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+struct RenderMeshInstance {
+  const SceneVertex* vertices = nullptr;
+  std::size_t vertex_count = 0;
+  Float4x4 model_transform{};
+};
+
+struct RenderCamera {
+  Float4x4 view_projection{};
+};
+
+struct RenderScene {
+  RenderCamera camera{};
+  const RenderMeshInstance* instances = nullptr;
+  std::size_t instance_count = 0;
+};
+
 class IRendererBackend {
  public:
   virtual ~IRendererBackend() = default;
@@ -25,6 +56,7 @@ class IRendererBackend {
   virtual bool Initialize(const RendererInitInfo& init_info) = 0;
   virtual bool BeginFrame() = 0;
   virtual void Clear(const ClearColor& color) = 0;
+  virtual void SubmitScene(const RenderScene& scene) = 0;
   virtual void EndFrame() = 0;
   virtual void Shutdown() = 0;
   virtual std::string_view Name() const = 0;
