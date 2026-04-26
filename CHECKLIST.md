@@ -345,13 +345,14 @@ Status: completed (pending local build verification)
 - Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
 - Phase 23 now introduces indexed/depth-tested geometry rendering, adds a minimal GLB test-mesh path, and removes automatic frame-count shutdown behavior.
 - Phase 24 removes the runtime frame-count shutdown setting again and renders one static cube through an indexed DX11 vertex/index/depth-buffer path.
+- The fixed cube camera now sits farther back with a wider orthographic volume to avoid near-plane clipping while we validate the baseline.
 
 ## Best Next Step
 
-Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the window shows one recognizable static cube over the configured clear color.
+Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the full cube is visible without near-plane clipping.
 
 ## Suggested Commit Message
 
 ```text
-feat: render static indexed cube baseline
+fix: move static cube camera away from near plane
 ```

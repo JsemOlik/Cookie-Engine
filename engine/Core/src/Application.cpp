@@ -205,9 +205,9 @@ int Application::Run() const {
                 static_cast<float>(config_.window_height)
           : 1.0f;
   const auto view = cookie::renderer::MakeLookAtView(
-      2.0f, 1.4f, -3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+      4.0f, 3.0f, -7.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
   const auto projection = cookie::renderer::MakeOrthographicProjection(
-      2.6f * aspect_ratio, 2.6f, 0.1f, 10.0f);
+      5.0f * aspect_ratio, 5.0f, 0.01f, 100.0f);
   const auto cube_transform =
       cookie::renderer::MultiplyTransforms(view, projection);
   while (!window->ShouldClose()) {
