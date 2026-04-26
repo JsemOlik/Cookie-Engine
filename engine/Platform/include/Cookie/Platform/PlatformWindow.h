@@ -5,6 +5,17 @@
 
 namespace cookie::platform {
 
+enum class KeyCode {
+  W,
+  A,
+  S,
+  D,
+  Q,
+  E,
+  Shift,
+  Escape,
+};
+
 struct WindowCreateInfo {
   std::string title = "CookieRuntime";
   int width = 1280;
@@ -19,6 +30,8 @@ class IPlatformWindow {
   virtual bool ShouldClose() const = 0;
   virtual void RequestClose() = 0;
   virtual void* GetNativeHandle() const = 0;
+  virtual bool IsKeyDown(KeyCode key) const = 0;
+  virtual void ConsumeMouseDelta(float& delta_x, float& delta_y) = 0;
 };
 
 std::unique_ptr<IPlatformWindow> CreatePlatformWindow(

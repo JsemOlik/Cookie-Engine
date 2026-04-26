@@ -1,8 +1,9 @@
 #include "Cookie/Core/Application.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <string>
-#include <thread>
 #include <utility>
 
 #include "Cookie/Core/ConfigPaths.h"
@@ -16,6 +17,47 @@
 #include "Cookie/Renderer/Transform.h"
 
 namespace cookie::core {
+namespace {
+
+struct Vec3 {
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+};
+
+Vec3 Add(const Vec3& a, const Vec3& b) {
+  return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+Vec3 Subtract(const Vec3& a, const Vec3& b) {
+  return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+Vec3 Scale(const Vec3& value, float scale) {
+  return {value.x * scale, value.y * scale, value.z * scale};
+}
+
+float Length(const Vec3& value) {
+  return std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
+}
+
+Vec3 Normalize(const Vec3& value) {
+  const float length = Length(value);
+  if (length <= 0.000001f) {
+    return {};
+  }
+  return Scale(value, 1.0f / length);
+}
+
+Vec3 Cross(const Vec3& a, const Vec3& b) {
+  return {
+      a.y * b.z - a.z * b.y,
+      a.z * b.x - a.x * b.z,
+      a.x * b.y - a.y * b.x,
+  };
+}
+
+} // namespace
 
 Application::Application(
     ApplicationConfig config,
@@ -75,6 +117,7 @@ int Application::Run() const {
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
   logger.Info("Camera mode: " + config_.camera_mode);
+  logger.Info("Fly camera controls: mouse look, WASD move, Q/E vertical, Shift speed.");
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -197,6 +240,8 @@ int Application::Run() const {
   }
 
   int frame_count = 0;
+  const auto frame_start_time = std::chrono::steady_clock::now();
+  auto last_frame_time = frame_start_time;
   cookie::renderer::SceneBuilder scene_builder;
   const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices();
   const auto cube_indices = cookie::renderer::MakeCubeIndices();
@@ -205,18 +250,90 @@ int Application::Run() const {
           ? static_cast<float>(config_.window_width) /
                 static_cast<float>(config_.window_height)
           : 1.0f;
-  const auto view = cookie::renderer::MakeLookAtView(
-      4.0f, 3.0f, -7.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
   const bool use_orthographic = (config_.camera_mode == "orthographic");
   const auto projection = use_orthographic
                               ? cookie::renderer::MakeOrthographicProjection(
                                     5.0f * aspect_ratio, 5.0f, 0.01f, 100.0f)
                               : cookie::renderer::MakePerspectiveProjection(
                                     1.04719755f, aspect_ratio, 0.01f, 100.0f);
-  const auto view_projection =
-      cookie::renderer::MultiplyTransforms(view, projection);
+
+  Vec3 camera_position{4.0f, 3.0f, -7.0f};
+  const Vec3 world_up{0.0f, 1.0f, 0.0f};
+  const Vec3 initial_target{0.0f, 0.0f, 0.0f};
+  const Vec3 initial_forward = Normalize(Subtract(initial_target, camera_position));
+  float yaw_radians = std::atan2(initial_forward.x, initial_forward.z);
+  float pitch_radians = std::asin(initial_forward.y);
+  constexpr float kMouseSensitivity = 0.0025f;
+  constexpr float kMoveSpeed = 4.5f;
+  constexpr float kFastMoveSpeed = 11.0f;
+
   while (!window->ShouldClose()) {
     window->PollEvents();
+    if (window->IsKeyDown(cookie::platform::KeyCode::Escape)) {
+      window->RequestClose();
+      continue;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    float delta_time_seconds =
+        std::chrono::duration<float>(now - last_frame_time).count();
+    last_frame_time = now;
+    if (delta_time_seconds <= 0.0f) {
+      delta_time_seconds = 1.0f / 60.0f;
+    }
+    delta_time_seconds = std::min(delta_time_seconds, 0.1f);
+
+    float mouse_delta_x = 0.0f;
+    float mouse_delta_y = 0.0f;
+    window->ConsumeMouseDelta(mouse_delta_x, mouse_delta_y);
+    yaw_radians += mouse_delta_x * kMouseSensitivity;
+    pitch_radians -= mouse_delta_y * kMouseSensitivity;
+    pitch_radians = std::clamp(pitch_radians, -1.54f, 1.54f);
+
+    const Vec3 forward = Normalize({
+        std::cos(pitch_radians) * std::sin(yaw_radians),
+        std::sin(pitch_radians),
+        std::cos(pitch_radians) * std::cos(yaw_radians),
+    });
+    const Vec3 right = Normalize(Cross(world_up, forward));
+
+    Vec3 movement{};
+    if (window->IsKeyDown(cookie::platform::KeyCode::W)) {
+      movement = Add(movement, forward);
+    }
+    if (window->IsKeyDown(cookie::platform::KeyCode::S)) {
+      movement = Subtract(movement, forward);
+    }
+    if (window->IsKeyDown(cookie::platform::KeyCode::D)) {
+      movement = Add(movement, right);
+    }
+    if (window->IsKeyDown(cookie::platform::KeyCode::A)) {
+      movement = Subtract(movement, right);
+    }
+    if (window->IsKeyDown(cookie::platform::KeyCode::E)) {
+      movement = Add(movement, world_up);
+    }
+    if (window->IsKeyDown(cookie::platform::KeyCode::Q)) {
+      movement = Subtract(movement, world_up);
+    }
+
+    const float movement_length = Length(movement);
+    if (movement_length > 0.0001f) {
+      const float speed = window->IsKeyDown(cookie::platform::KeyCode::Shift)
+                              ? kFastMoveSpeed
+                              : kMoveSpeed;
+      const Vec3 direction = Scale(movement, 1.0f / movement_length);
+      camera_position = Add(
+          camera_position, Scale(direction, speed * delta_time_seconds));
+    }
+
+    const Vec3 camera_target = Add(camera_position, forward);
+    const auto view = cookie::renderer::MakeLookAtView(
+        camera_position.x, camera_position.y, camera_position.z,
+        camera_target.x, camera_target.y, camera_target.z,
+        world_up.x, world_up.y, world_up.z);
+    const auto view_projection =
+        cookie::renderer::MultiplyTransforms(view, projection);
 
     if (!renderer_backend_->BeginFrame()) {
       logger.Error("Renderer backend BeginFrame failed.");
@@ -226,7 +343,9 @@ int Application::Run() const {
 
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
-    const float angle = static_cast<float>(frame_count) * (1.0f / 60.0f);
+    const float elapsed_seconds =
+        std::chrono::duration<float>(now - frame_start_time).count();
+    const float angle = elapsed_seconds;
     const auto world =
         cookie::renderer::MultiplyTransforms(
             cookie::renderer::MakeXRotationTransform(angle * 0.9f),
@@ -244,14 +363,14 @@ int Application::Run() const {
     ++frame_count;
     const cookie::core::PhysicsStepStats step_stats =
         physics_backend_->StepSimulation({
-            .delta_time_seconds = 1.0f / 60.0f,
+            .delta_time_seconds = delta_time_seconds,
         });
     audio_backend_->Update({
-        .delta_time_seconds = 1.0f / 60.0f,
+        .delta_time_seconds = delta_time_seconds,
     });
 
     if (game_logic.IsLoaded()) {
-      game_logic.Update(1.0f / 60.0f);
+      game_logic.Update(delta_time_seconds);
     }
 
     if (frame_count == 1) {
@@ -263,8 +382,6 @@ int Application::Run() const {
             "Hint: configure/build with x64-debug-vcpkg preset to enable vcpkg Jolt integration.");
       }
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
   logger.Info("Frame loop ended after " + std::to_string(frame_count) + " frames.");

@@ -52,6 +52,7 @@ class Win32Window final : public IPlatformWindow {
       TranslateMessage(&message);
       DispatchMessage(&message);
     }
+    UpdateMouseDelta();
   }
 
   bool ShouldClose() const override {
@@ -69,6 +70,21 @@ class Win32Window final : public IPlatformWindow {
     return handle_;
   }
 
+  bool IsKeyDown(KeyCode key) const override {
+    if (handle_ == nullptr || GetForegroundWindow() != handle_) {
+      return false;
+    }
+
+    return (GetAsyncKeyState(ToVirtualKey(key)) & 0x8000) != 0;
+  }
+
+  void ConsumeMouseDelta(float& delta_x, float& delta_y) override {
+    delta_x = mouse_delta_x_;
+    delta_y = mouse_delta_y_;
+    mouse_delta_x_ = 0.0f;
+    mouse_delta_y_ = 0.0f;
+  }
+
   void OnCloseMessage() {
     should_close_ = true;
   }
@@ -78,8 +94,74 @@ class Win32Window final : public IPlatformWindow {
   }
 
  private:
+  static int ToVirtualKey(KeyCode key) {
+    switch (key) {
+      case KeyCode::W:
+        return 'W';
+      case KeyCode::A:
+        return 'A';
+      case KeyCode::S:
+        return 'S';
+      case KeyCode::D:
+        return 'D';
+      case KeyCode::Q:
+        return 'Q';
+      case KeyCode::E:
+        return 'E';
+      case KeyCode::Shift:
+        return VK_SHIFT;
+      case KeyCode::Escape:
+        return VK_ESCAPE;
+      default:
+        return 0;
+    }
+  }
+
+  void UpdateMouseDelta() {
+    if (handle_ == nullptr || GetForegroundWindow() != handle_) {
+      mouse_initialized_ = false;
+      mouse_delta_x_ = 0.0f;
+      mouse_delta_y_ = 0.0f;
+      return;
+    }
+
+    RECT client_rect{};
+    if (!GetClientRect(handle_, &client_rect)) {
+      return;
+    }
+
+    POINT center{
+        (client_rect.left + client_rect.right) / 2,
+        (client_rect.top + client_rect.bottom) / 2,
+    };
+    if (!ClientToScreen(handle_, &center)) {
+      return;
+    }
+
+    POINT cursor{};
+    if (!GetCursorPos(&cursor)) {
+      return;
+    }
+
+    if (!mouse_initialized_) {
+      SetCursorPos(center.x, center.y);
+      mouse_initialized_ = true;
+      return;
+    }
+
+    mouse_delta_x_ += static_cast<float>(cursor.x - center.x);
+    mouse_delta_y_ += static_cast<float>(cursor.y - center.y);
+
+    if (cursor.x != center.x || cursor.y != center.y) {
+      SetCursorPos(center.x, center.y);
+    }
+  }
+
   HWND handle_ = nullptr;
   bool should_close_ = false;
+  bool mouse_initialized_ = false;
+  float mouse_delta_x_ = 0.0f;
+  float mouse_delta_y_ = 0.0f;
 };
 
 LRESULT CALLBACK WindowProc(HWND window_handle, UINT message, WPARAM w_param,
@@ -174,6 +256,14 @@ class NullPlatformWindow final : public IPlatformWindow {
   void RequestClose() override {}
   void* GetNativeHandle() const override {
     return nullptr;
+  }
+  bool IsKeyDown(KeyCode key) const override {
+    (void)key;
+    return false;
+  }
+  void ConsumeMouseDelta(float& delta_x, float& delta_y) override {
+    delta_x = 0.0f;
+    delta_y = 0.0f;
   }
 };
 
