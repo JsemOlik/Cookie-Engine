@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <string>
 #include <utility>
 
@@ -243,6 +244,13 @@ int Application::Run() const {
   int frame_count = 0;
   const auto frame_start_time = std::chrono::steady_clock::now();
   auto last_frame_time = frame_start_time;
+  std::filesystem::path demo_albedo_texture_path(config_.demo_albedo_texture);
+  if (!demo_albedo_texture_path.empty() &&
+      demo_albedo_texture_path.is_relative()) {
+    demo_albedo_texture_path = paths.project_root / demo_albedo_texture_path;
+  }
+  const std::string resolved_demo_albedo_texture =
+      demo_albedo_texture_path.string();
   cookie::renderer::SceneBuilder scene_builder;
   const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices();
   const auto cube_indices = cookie::renderer::MakeCubeIndices();
@@ -345,7 +353,7 @@ int Application::Run() const {
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
     cookie::renderer::RenderMaterial demo_material{};
-    demo_material.albedo_texture_path = config_.demo_albedo_texture.c_str();
+    demo_material.albedo_texture_path = resolved_demo_albedo_texture.c_str();
     demo_material.tint[0] = 1.0f;
     demo_material.tint[1] = 1.0f;
     demo_material.tint[2] = 1.0f;

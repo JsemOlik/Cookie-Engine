@@ -8,7 +8,7 @@
 namespace cookie::renderer {
 
 std::array<SceneVertex, 3> MakeColoredTriangle();
-std::array<SceneVertex, 8> MakeColoredCubeVertices();
+std::array<SceneVertex, 24> MakeColoredCubeVertices();
 std::array<std::uint32_t, 36> MakeCubeIndices();
 
 } // namespace cookie::renderer
