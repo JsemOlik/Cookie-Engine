@@ -262,7 +262,7 @@ class RendererDX11Backend final : public IRendererBackend {
  private:
 #if defined(_WIN32)
   struct SceneConstantData {
-    float model[16];
+    float world_view_projection[16];
   };
 
   bool CompileShader(const char* source, const char* entry_point,
@@ -295,7 +295,7 @@ class RendererDX11Backend final : public IRendererBackend {
 
     constexpr const char* vertex_shader_source = R"(
 cbuffer SceneConstants : register(b0) {
-  float4x4 u_model;
+  row_major float4x4 u_world_view_projection;
 };
 
 struct VSIn {
@@ -310,7 +310,7 @@ struct PSIn {
 
 PSIn VSMain(VSIn input) {
   PSIn output;
-  output.position = mul(float4(input.position, 1.0f), u_model);
+  output.position = mul(float4(input.position, 1.0f), u_world_view_projection);
   output.color = input.color;
   return output;
 }
@@ -552,7 +552,7 @@ float4 PSMain(PSIn input) : SV_Target {
     }
 
     SceneConstantData constants{};
-    CopyMatrix16(constants.model, instance.model_transform);
+    CopyMatrix16(constants.world_view_projection, instance.model_transform);
 
     D3D11_MAPPED_SUBRESOURCE mapped_constants{};
     const HRESULT constant_map_result = device_context_->Map(
