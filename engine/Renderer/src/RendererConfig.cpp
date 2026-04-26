@@ -226,48 +226,9 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
     config.window_height = parsed_height;
   }
 
-  const std::string parsed_camera_mode =
-      ToLower(ExtractStringValue(contents, "camera_mode"));
-  if (parsed_camera_mode == "orthographic" || parsed_camera_mode == "perspective") {
-    config.camera_mode = parsed_camera_mode;
-  }
-
-  const float parsed_ortho_height =
-      ExtractFloatValue(contents, "camera_ortho_height");
-  if (parsed_ortho_height > 0.0f) {
-    config.camera_ortho_height = parsed_ortho_height;
-  }
-
-  const float parsed_perspective_fov =
-      ExtractFloatValue(contents, "camera_perspective_fov_degrees");
-  if (parsed_perspective_fov > 0.0f) {
-    config.camera_perspective_fov_degrees = parsed_perspective_fov;
-  }
-
-  const float parsed_near_plane = ExtractFloatValue(contents, "camera_near_plane");
-  const float parsed_far_plane = ExtractFloatValue(contents, "camera_far_plane");
-  if (parsed_far_plane != parsed_near_plane) {
-    config.camera_near_plane = parsed_near_plane;
-    config.camera_far_plane = parsed_far_plane;
-  }
-
-  config.camera_orbit_enabled =
-      ExtractBoolValue(contents, "camera_orbit_enabled", config.camera_orbit_enabled);
-
-  const float parsed_orbit_radius =
-      ExtractFloatValue(contents, "camera_orbit_radius");
-  if (parsed_orbit_radius > 0.0f) {
-    config.camera_orbit_radius = parsed_orbit_radius;
-  }
-
-  const float parsed_orbit_height =
-      ExtractFloatValue(contents, "camera_orbit_height");
-  config.camera_orbit_height = parsed_orbit_height;
-
-  const float parsed_orbit_speed =
-      ExtractFloatValue(contents, "camera_orbit_speed");
-  if (parsed_orbit_speed > 0.0f) {
-    config.camera_orbit_speed = parsed_orbit_speed;
+  const int parsed_max_frames = ExtractIntegerValue(contents, "max_frames");
+  if (parsed_max_frames > 0) {
+    config.max_frames = parsed_max_frames;
   }
 
   TryExtractClearColor(contents, config.clear_color);

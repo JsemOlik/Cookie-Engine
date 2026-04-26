@@ -512,16 +512,7 @@ int main(int argc, char** argv) {
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
-      .camera_mode = renderer_config.camera_mode,
-      .camera_ortho_height = renderer_config.camera_ortho_height,
-      .camera_perspective_fov_degrees =
-          renderer_config.camera_perspective_fov_degrees,
-      .camera_near_plane = renderer_config.camera_near_plane,
-      .camera_far_plane = renderer_config.camera_far_plane,
-      .camera_orbit_enabled = renderer_config.camera_orbit_enabled,
-      .camera_orbit_radius = renderer_config.camera_orbit_radius,
-      .camera_orbit_height = renderer_config.camera_orbit_height,
-      .camera_orbit_speed = renderer_config.camera_orbit_speed,
+      .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
   }, std::move(audio_bootstrap.backend), std::move(physics_bootstrap.backend),
      std::move(renderer_bootstrap.backend));

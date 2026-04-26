@@ -1,8 +1,8 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 23 - Indexed Cube Rendering And Persistent Runtime Loop
+## Current Phase: Phase 23R - Rollback To 2D Rotating Triangles Baseline
 
-Status: completed (skeleton scope, pending local build verification)
+Status: completed (pending local build verification)
 
 ## Completed
 
@@ -149,6 +149,11 @@ Status: completed (skeleton scope, pending local build verification)
 - [x] Wired runtime to load `content/models/test_mesh.glb` and render it as indexed geometry, with cube fallback if load fails.
 - [x] Removed `max_frames` from graphics/runtime config and removed frame-count auto-shutdown logic.
 - [x] Updated runtime phase milestone log to Phase 23 completion text.
+- [x] Removed GLB mesh loader from `engine/Assets` and runtime flow.
+- [x] Removed indexed/depth/camera-orbit 3D scene path and restored 2D triangle scene path.
+- [x] Restored `max_frames` in renderer/runtime config and frame loop shutdown behavior.
+- [x] Simplified renderer contracts back to non-indexed mesh instances without camera payload in `RenderScene`.
+- [x] Reverted DX11 backend to model-transform-only draw path for rotating 2D triangles.
 
 ## Not Started
 
@@ -337,10 +342,10 @@ Status: completed (skeleton scope, pending local build verification)
 
 ## Best Next Step
 
-Phase 24: add basic raster state controls (backface culling + wireframe debug toggle) and configurable per-scene rotation/placement values in `graphics.json` for faster visual debugging.
+Phase 24: add a clean GLTF/GLB import phase behind a dedicated opt-in render path, after locking this 2D baseline with tests and keeping runtime defaults unchanged.
 
 ## Suggested Commit Message
 
 ```text
-feat: add indexed cube rendering and remove max-frames auto shutdown
+revert: restore 2d rotating-triangle runtime baseline and remove 3d camera/glb path
 ```
