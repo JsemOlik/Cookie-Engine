@@ -31,7 +31,6 @@ struct ApplicationConfig {
   std::string window_title;
   int window_width = 1280;
   int window_height = 720;
-  int max_frames = 300;
   cookie::renderer::ClearColor clear_color{};
 };
 

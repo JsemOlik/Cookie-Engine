@@ -49,8 +49,8 @@ int Application::Run() const {
     logger.Info("Core module name: " + config_.core_module_name);
   }
   if (config_.core_module_api_version > 0) {
-    logger.Info(
-        "Core module API version: " + std::to_string(config_.core_module_api_version));
+    logger.Info("Core module API version: " +
+                std::to_string(config_.core_module_api_version));
   }
   logger.Info("Selected renderer backend: " + config_.renderer_backend_name);
   if (!config_.renderer_runtime_source.empty()) {
@@ -74,7 +74,6 @@ int Application::Run() const {
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
-  logger.Info("Max frames: " + std::to_string(config_.max_frames));
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -198,7 +197,18 @@ int Application::Run() const {
 
   int frame_count = 0;
   cookie::renderer::SceneBuilder scene_builder;
-  const auto triangle = cookie::renderer::MakeColoredTriangle();
+  const auto cube = cookie::renderer::MakeColoredCube();
+  const float aspect_ratio =
+      (config_.window_height > 0)
+          ? static_cast<float>(config_.window_width) /
+                static_cast<float>(config_.window_height)
+          : 1.0f;
+  const auto view = cookie::renderer::MakeLookAtView(
+      2.0f, 1.4f, -3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+  const auto projection = cookie::renderer::MakeOrthographicProjection(
+      2.6f * aspect_ratio, 2.6f, 0.1f, 10.0f);
+  const auto cube_transform =
+      cookie::renderer::MultiplyTransforms(view, projection);
   while (!window->ShouldClose()) {
     window->PollEvents();
 
@@ -210,22 +220,7 @@ int Application::Run() const {
 
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
-    const auto left_model =
-        cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(-0.45f, 0.0f, 0.0f),
-            cookie::renderer::MultiplyTransforms(
-                cookie::renderer::MakeZRotationTransform(
-                    static_cast<float>(frame_count) * 0.02f),
-                cookie::renderer::MakeScaleTransform(0.95f, 0.95f, 1.0f)));
-    const auto right_model =
-        cookie::renderer::MultiplyTransforms(
-            cookie::renderer::MakeTranslationTransform(0.55f, 0.0f, 0.0f),
-            cookie::renderer::MultiplyTransforms(
-                cookie::renderer::MakeZRotationTransform(
-                    static_cast<float>(frame_count) * -0.03f),
-                cookie::renderer::MakeScaleTransform(0.65f, 0.65f, 1.0f)));
-    scene_builder.AddMeshInstance(triangle.data(), triangle.size(), left_model);
-    scene_builder.AddMeshInstance(triangle.data(), triangle.size(), right_model);
+    scene_builder.AddMeshInstance(cube.data(), cube.size(), cube_transform);
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
@@ -252,11 +247,6 @@ int Application::Run() const {
       }
     }
 
-    if (config_.max_frames > 0 && frame_count >= config_.max_frames) {
-      logger.Info("Frame loop reached max_frames, requesting shutdown.");
-      window->RequestClose();
-    }
-
     std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
@@ -272,7 +262,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase rollback complete. 2D rotating triangle scene restored.");
+  logger.Info("Phase 24 complete. Static cube render path wired.");
 
   return 0;
 }

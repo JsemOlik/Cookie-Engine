@@ -111,6 +111,16 @@ class RendererDX11Backend final : public IRendererBackend {
       return false;
     }
 
+    if (!CreateDepthResources(width, height)) {
+      Shutdown();
+      return false;
+    }
+
+    if (!CreateRasterizerState()) {
+      Shutdown();
+      return false;
+    }
+
     D3D11_VIEWPORT viewport{};
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
@@ -139,8 +149,10 @@ class RendererDX11Backend final : public IRendererBackend {
 
   bool BeginFrame() override {
 #if defined(_WIN32)
-    if (initialized_ && device_context_ != nullptr && render_target_view_ != nullptr) {
-      device_context_->OMSetRenderTargets(1, &render_target_view_, nullptr);
+    if (initialized_ && device_context_ != nullptr && render_target_view_ != nullptr &&
+        depth_stencil_view_ != nullptr) {
+      device_context_->OMSetRenderTargets(1, &render_target_view_, depth_stencil_view_);
+      device_context_->RSSetState(rasterizer_state_);
     }
 #endif
     return initialized_;
@@ -153,6 +165,10 @@ class RendererDX11Backend final : public IRendererBackend {
     }
     const float clear_color[] = {color.red, color.green, color.blue, color.alpha};
     device_context_->ClearRenderTargetView(render_target_view_, clear_color);
+    if (depth_stencil_view_ != nullptr) {
+      device_context_->ClearDepthStencilView(
+          depth_stencil_view_, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    }
 #else
     (void)color;
 #endif
@@ -185,6 +201,10 @@ class RendererDX11Backend final : public IRendererBackend {
       vertex_buffer_ = nullptr;
     }
     vertex_buffer_capacity_bytes_ = 0;
+    if (rasterizer_state_ != nullptr) {
+      rasterizer_state_->Release();
+      rasterizer_state_ = nullptr;
+    }
     if (scene_constant_buffer_ != nullptr) {
       scene_constant_buffer_->Release();
       scene_constant_buffer_ = nullptr;
@@ -204,6 +224,14 @@ class RendererDX11Backend final : public IRendererBackend {
     if (render_target_view_ != nullptr) {
       render_target_view_->Release();
       render_target_view_ = nullptr;
+    }
+    if (depth_stencil_view_ != nullptr) {
+      depth_stencil_view_->Release();
+      depth_stencil_view_ = nullptr;
+    }
+    if (depth_stencil_buffer_ != nullptr) {
+      depth_stencil_buffer_->Release();
+      depth_stencil_buffer_ = nullptr;
     }
     if (swap_chain_ != nullptr) {
       swap_chain_->Release();
@@ -358,6 +386,46 @@ float4 PSMain(PSIn input) : SV_Target {
     return true;
   }
 
+  bool CreateDepthResources(UINT width, UINT height) {
+    if (device_ == nullptr || width == 0 || height == 0) {
+      return false;
+    }
+
+    D3D11_TEXTURE2D_DESC depth_desc{};
+    depth_desc.Width = width;
+    depth_desc.Height = height;
+    depth_desc.MipLevels = 1;
+    depth_desc.ArraySize = 1;
+    depth_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depth_desc.SampleDesc.Count = 1;
+    depth_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+    const HRESULT depth_result =
+        device_->CreateTexture2D(&depth_desc, nullptr, &depth_stencil_buffer_);
+    if (FAILED(depth_result) || depth_stencil_buffer_ == nullptr) {
+      return false;
+    }
+
+    const HRESULT view_result = device_->CreateDepthStencilView(
+        depth_stencil_buffer_, nullptr, &depth_stencil_view_);
+    return SUCCEEDED(view_result) && depth_stencil_view_ != nullptr;
+  }
+
+  bool CreateRasterizerState() {
+    if (device_ == nullptr) {
+      return false;
+    }
+
+    D3D11_RASTERIZER_DESC rasterizer_desc{};
+    rasterizer_desc.FillMode = D3D11_FILL_SOLID;
+    rasterizer_desc.CullMode = D3D11_CULL_NONE;
+    rasterizer_desc.DepthClipEnable = TRUE;
+
+    const HRESULT result =
+        device_->CreateRasterizerState(&rasterizer_desc, &rasterizer_state_);
+    return SUCCEEDED(result) && rasterizer_state_ != nullptr;
+  }
+
   bool EnsureVertexBufferCapacity(std::size_t required_bytes) {
     if (required_bytes == 0 || required_bytes > static_cast<std::size_t>(UINT_MAX)) {
       return false;
@@ -459,11 +527,14 @@ float4 PSMain(PSIn input) : SV_Target {
   ID3D11DeviceContext* device_context_ = nullptr;
   IDXGISwapChain* swap_chain_ = nullptr;
   ID3D11RenderTargetView* render_target_view_ = nullptr;
+  ID3D11Texture2D* depth_stencil_buffer_ = nullptr;
+  ID3D11DepthStencilView* depth_stencil_view_ = nullptr;
   ID3D11VertexShader* vertex_shader_ = nullptr;
   ID3D11PixelShader* pixel_shader_ = nullptr;
   ID3D11InputLayout* input_layout_ = nullptr;
   ID3D11Buffer* scene_constant_buffer_ = nullptr;
   ID3D11Buffer* vertex_buffer_ = nullptr;
+  ID3D11RasterizerState* rasterizer_state_ = nullptr;
   std::size_t vertex_buffer_capacity_bytes_ = 0;
 #endif
 };

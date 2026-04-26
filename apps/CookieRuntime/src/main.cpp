@@ -512,7 +512,6 @@ int main(int argc, char** argv) {
       .window_title = renderer_config.window_title,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
-      .max_frames = renderer_config.max_frames,
       .clear_color = renderer_config.clear_color,
   }, std::move(audio_bootstrap.backend), std::move(physics_bootstrap.backend),
      std::move(renderer_bootstrap.backend));

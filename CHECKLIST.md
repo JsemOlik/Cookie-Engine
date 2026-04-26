@@ -1,6 +1,6 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 23R - Rollback To 2D Rotating Triangles Baseline
+## Current Phase: Phase 24 - Static Cube Baseline
 
 Status: completed (pending local build verification)
 
@@ -30,7 +30,7 @@ Status: completed (pending local build verification)
 - [x] Extended renderer abstraction with frame lifecycle methods (`BeginFrame`, `Clear`, `EndFrame`).
 - [x] Updated DX11 backend skeleton to implement frame lifecycle as non-rendering stubs.
 - [x] Added runtime frame loop that drives renderer methods through interfaces.
-- [x] Extended `graphics.json` support with window settings, clear color, and optional `max_frames`.
+- [x] Extended `graphics.json` support with window settings and clear color.
 - [x] Fixed Win32 window API usage to explicit Unicode (`W`) calls for MSVC builds.
 - [x] Fixed Win32 cursor resource id for `LoadCursorW` in non-UNICODE builds using `MAKEINTRESOURCEW(32512)`.
 - [x] Added `engine/Assets` module with package loader and asset registry interfaces.
@@ -131,7 +131,7 @@ Status: completed (pending local build verification)
 - [x] Updated runtime scene camera to use renderer-provided orthographic projection.
 - [x] Updated runtime demo scene to render multiple world-space instances with independent transforms/animation.
 - [x] Updated runtime phase milestone log to Phase 20 completion text.
-- [x] Added camera configuration fields to `graphics.json` (`camera_mode`, ortho height, perspective FOV, near/far).
+- [x] Experimented with camera configuration fields in `graphics.json` during the earlier 3D prototype.
 - [x] Extended `RendererConfig` parsing to read camera mode/settings from config.
 - [x] Threaded camera settings through runtime `ApplicationConfig` and projection selection.
 - [x] Added runtime startup camera logs to confirm config-driven values in use.
@@ -147,13 +147,18 @@ Status: completed (pending local build verification)
 - [x] Updated runtime demo scene to render indexed cubes instead of non-indexed triangles.
 - [x] Added minimal GLB mesh loader in assets module for first-mesh/first-primitive test loading.
 - [x] Wired runtime to load `content/models/test_mesh.glb` and render it as indexed geometry, with cube fallback if load fails.
-- [x] Removed `max_frames` from graphics/runtime config and removed frame-count auto-shutdown logic.
+- [x] Removed frame-count auto-shutdown logic from graphics/runtime config.
 - [x] Updated runtime phase milestone log to Phase 23 completion text.
 - [x] Removed GLB mesh loader from `engine/Assets` and runtime flow.
 - [x] Removed indexed/depth/camera-orbit 3D scene path and restored 2D triangle scene path.
-- [x] Restored `max_frames` in renderer/runtime config and frame loop shutdown behavior.
+- [x] Temporarily restored frame-count shutdown behavior during the 2D rollback checkpoint.
 - [x] Simplified renderer contracts back to non-indexed mesh instances without camera payload in `RenderScene`.
 - [x] Reverted DX11 backend to model-transform-only draw path for rotating 2D triangles.
+- [x] Removed frame-count shutdown behavior from graphics/runtime config.
+- [x] Added a static, non-indexed colored cube primitive.
+- [x] Added fixed orthographic view/projection helpers for the static cube path.
+- [x] Updated runtime scene submission to render one static cube with no animation, scaling, or orbiting camera.
+- [x] Added DX11 depth buffer/depth clear path so cube faces draw with correct depth ordering.
 
 ## Not Started
 
@@ -184,7 +189,7 @@ Status: completed (pending local build verification)
   - `Renderer backend initialized successfully.`
   - `Renderer backend shut down successfully.`
 - [ ] Confirm `CookieRuntime` opens a window with title from `graphics.json`.
-- [ ] Confirm runtime remains open indefinitely until manual window close.
+- [ ] Confirm runtime remains open until manual window close.
 - [ ] Confirm `logs/latest.log` includes frame loop start/end lines and total frame count.
 - [ ] Confirm `cmake --build out/build/x64-debug` succeeds after the Unicode Win32 API fix.
 - [ ] Confirm runtime log includes asset mount lines for `content/base.pak` and discovered asset count.
@@ -268,15 +273,12 @@ Status: completed (pending local build verification)
 - [ ] Build and run `CookieRuntime` and confirm two triangle instances render with different scale/position and opposite rotation speeds.
 - [ ] Confirm runtime and exported game logs now end with `Phase 20 complete. Camera projection utilities wired.`.
 - [ ] Confirm world-space placement remains stable when window aspect changes (orthographic projection path active).
-- [ ] Set `camera_mode` to `orthographic` and confirm runtime uses orthographic projection with configured ortho height.
-- [ ] Set `camera_mode` to `perspective` with valid near/far/FOV and confirm runtime uses perspective projection without code changes.
-- [ ] Confirm runtime startup logs print camera mode/settings from `graphics.json`.
-- [ ] Toggle `camera_orbit_enabled` true/false and confirm camera motion starts/stops while scene still renders.
-- [ ] Adjust `camera_orbit_radius` and `camera_orbit_speed` in `graphics.json` and confirm visible camera path changes.
+- [ ] Confirm runtime startup no longer logs configurable camera mode/settings from `graphics.json`.
+- [ ] Confirm runtime has no configurable orbit camera behavior.
 - [ ] Confirm runtime and exported game logs now end with `Phase 22 complete. View matrix and orbit camera skeleton wired.`.
 - [ ] Build and run `CookieRuntime` and confirm indexed cube geometry is visible (not just flat 2D triangle output).
 - [ ] Confirm runtime and exported game logs now end with `Phase 23 complete. Indexed cube render path wired.`.
-- [ ] Confirm there is no `max_frames` setting in `config/graphics.json` and runtime no longer auto-closes by frame count.
+- [ ] Confirm runtime no longer has a frame-count shutdown setting and does not auto-close by frame count.
 - [ ] Place `content/models/test_mesh.glb`, run runtime, and confirm GLB load log lines appear with vertex/index counts.
 - [ ] Confirm runtime falls back to cube geometry with a clear log reason if GLB loading fails.
 - [x] Confirm OpenGL, save, and mod support are still intentionally not implemented.
@@ -339,13 +341,14 @@ Status: completed (pending local build verification)
 - Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
 - Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
 - Phase 23 now introduces indexed/depth-tested geometry rendering, adds a minimal GLB test-mesh path, and removes automatic frame-count shutdown behavior.
+- Phase 24 removes the runtime frame-count shutdown setting again and replaces the animated triangle demo with one static cube rendered through DX11 depth buffering.
 
 ## Best Next Step
 
-Phase 24: add a clean GLTF/GLB import phase behind a dedicated opt-in render path, after locking this 2D baseline with tests and keeping runtime defaults unchanged.
+Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the window shows one static cube over the configured clear color.
 
 ## Suggested Commit Message
 
 ```text
-revert: restore 2d rotating-triangle runtime baseline and remove 3d camera/glb path
+feat: render static cube baseline
 ```
