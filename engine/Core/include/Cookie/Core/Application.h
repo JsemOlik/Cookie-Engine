@@ -29,6 +29,7 @@ struct ApplicationConfig {
   std::string audio_runtime_source;
   std::string audio_module_path;
   std::string window_title;
+  std::string camera_mode = "perspective";
   int window_width = 1280;
   int window_height = 720;
   cookie::renderer::ClearColor clear_color{};

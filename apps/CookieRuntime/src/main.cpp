@@ -510,6 +510,7 @@ int main(int argc, char** argv) {
       .audio_runtime_source = audio_bootstrap.runtime_source,
       .audio_module_path = audio_bootstrap.module_path,
       .window_title = renderer_config.window_title,
+      .camera_mode = renderer_config.camera_mode,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .clear_color = renderer_config.clear_color,

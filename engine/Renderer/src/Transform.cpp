@@ -129,6 +129,30 @@ Float4x4 MakeOrthographicProjection(float width, float height, float near_plane,
   return matrix;
 }
 
+Float4x4 MakePerspectiveProjection(float vertical_fov_radians, float aspect_ratio,
+                                   float near_plane, float far_plane) {
+  if (vertical_fov_radians <= 0.0f || aspect_ratio <= 0.0f ||
+      near_plane <= 0.0f || near_plane == far_plane) {
+    return MakeIdentityTransform();
+  }
+
+  const float tan_half_fov = std::tan(vertical_fov_radians * 0.5f);
+  if (tan_half_fov == 0.0f) {
+    return MakeIdentityTransform();
+  }
+
+  Float4x4 matrix = MakeZeroMatrix();
+  const float y_scale = 1.0f / tan_half_fov;
+  const float x_scale = y_scale / aspect_ratio;
+  const float z_scale = far_plane / (far_plane - near_plane);
+  matrix.m[0] = x_scale;
+  matrix.m[5] = y_scale;
+  matrix.m[10] = z_scale;
+  matrix.m[11] = 1.0f;
+  matrix.m[14] = (-near_plane * far_plane) / (far_plane - near_plane);
+  return matrix;
+}
+
 Float4x4 MakeLookAtView(float eye_x, float eye_y, float eye_z, float target_x,
                         float target_y, float target_z, float up_x, float up_y,
                         float up_z) {

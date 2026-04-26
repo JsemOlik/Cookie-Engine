@@ -74,6 +74,7 @@ int Application::Run() const {
   logger.Info("Window title: " + config_.window_title);
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
+  logger.Info("Camera mode: " + config_.camera_mode);
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
   logger.Info("Engine config: " + paths.engine_config.string());
@@ -206,8 +207,12 @@ int Application::Run() const {
           : 1.0f;
   const auto view = cookie::renderer::MakeLookAtView(
       4.0f, 3.0f, -7.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-  const auto projection = cookie::renderer::MakeOrthographicProjection(
-      5.0f * aspect_ratio, 5.0f, 0.01f, 100.0f);
+  const bool use_orthographic = (config_.camera_mode == "orthographic");
+  const auto projection = use_orthographic
+                              ? cookie::renderer::MakeOrthographicProjection(
+                                    5.0f * aspect_ratio, 5.0f, 0.01f, 100.0f)
+                              : cookie::renderer::MakePerspectiveProjection(
+                                    1.04719755f, aspect_ratio, 0.01f, 100.0f);
   const auto view_projection =
       cookie::renderer::MultiplyTransforms(view, projection);
   while (!window->ShouldClose()) {

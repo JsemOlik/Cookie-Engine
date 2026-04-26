@@ -216,6 +216,13 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
     config.window_title = parsed_title;
   }
 
+  const std::string parsed_camera_mode =
+      ToLower(ExtractStringValue(contents, "camera_mode"));
+  if (parsed_camera_mode == "orthographic" ||
+      parsed_camera_mode == "perspective") {
+    config.camera_mode = parsed_camera_mode;
+  }
+
   const int parsed_width = ExtractIntegerValue(contents, "window_width");
   if (parsed_width > 0) {
     config.window_width = parsed_width;
