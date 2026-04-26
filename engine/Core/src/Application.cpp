@@ -208,7 +208,7 @@ int Application::Run() const {
       4.0f, 3.0f, -7.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
   const auto projection = cookie::renderer::MakeOrthographicProjection(
       5.0f * aspect_ratio, 5.0f, 0.01f, 100.0f);
-  const auto cube_transform =
+  const auto view_projection =
       cookie::renderer::MultiplyTransforms(view, projection);
   while (!window->ShouldClose()) {
     window->PollEvents();
@@ -221,6 +221,15 @@ int Application::Run() const {
 
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
+    const float angle = static_cast<float>(frame_count) * (1.0f / 60.0f);
+    const auto world =
+        cookie::renderer::MultiplyTransforms(
+            cookie::renderer::MakeXRotationTransform(angle * 0.9f),
+            cookie::renderer::MultiplyTransforms(
+                cookie::renderer::MakeYRotationTransform(angle * 0.65f),
+                cookie::renderer::MakeZRotationTransform(angle * 0.45f)));
+    const auto cube_transform =
+        cookie::renderer::MultiplyTransforms(world, view_projection);
     scene_builder.AddIndexedMeshInstance(
         cube_vertices.data(), cube_vertices.size(),
         cube_indices.data(), cube_indices.size(), cube_transform);

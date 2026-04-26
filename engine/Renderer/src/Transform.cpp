@@ -51,6 +51,28 @@ Float4x4 MakeIdentityTransform() {
   return {};
 }
 
+Float4x4 MakeXRotationTransform(float radians) {
+  Float4x4 matrix = MakeIdentityTransform();
+  const float c = std::cos(radians);
+  const float s = std::sin(radians);
+  matrix.m[5] = c;
+  matrix.m[6] = s;
+  matrix.m[9] = -s;
+  matrix.m[10] = c;
+  return matrix;
+}
+
+Float4x4 MakeYRotationTransform(float radians) {
+  Float4x4 matrix = MakeIdentityTransform();
+  const float c = std::cos(radians);
+  const float s = std::sin(radians);
+  matrix.m[0] = c;
+  matrix.m[2] = -s;
+  matrix.m[8] = s;
+  matrix.m[10] = c;
+  return matrix;
+}
+
 Float4x4 MakeZRotationTransform(float radians) {
   Float4x4 matrix = MakeIdentityTransform();
   const float c = std::cos(radians);

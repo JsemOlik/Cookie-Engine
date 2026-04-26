@@ -347,13 +347,14 @@ Status: completed (pending local build verification)
 - Phase 24 removes the runtime frame-count shutdown setting again and renders one static cube through an indexed DX11 vertex/index/depth-buffer path.
 - The fixed cube camera now sits farther back with a wider orthographic volume to avoid near-plane clipping while we validate the baseline.
 - The DX11 cube shader now declares the uploaded transform as `row_major` so it matches the engine's row-vector CPU matrix convention.
+- The runtime static cube now rotates continuously on X/Y/Z axes with independent angular speeds.
 
 ## Best Next Step
 
-Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the cube is no longer diagonally sliced or warped.
+Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the cube rotates smoothly across all three axes without warping.
 
 ## Suggested Commit Message
 
 ```text
-fix: align dx11 cube matrix layout with engine transforms
+feat: animate indexed cube with xyz rotation
 ```
