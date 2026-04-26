@@ -159,6 +159,9 @@ Status: completed (pending local build verification)
 - [x] Added fixed orthographic view/projection helpers for the static cube path.
 - [x] Updated runtime scene submission to render one static cube with no animation, scaling, or orbiting camera.
 - [x] Added DX11 depth buffer/depth clear path so cube faces draw with correct depth ordering.
+- [x] Replaced the non-indexed cube mesh with 8 vertices plus 36 indices.
+- [x] Re-added indexed mesh instances to renderer scene contracts and `SceneBuilder`.
+- [x] Updated DX11 backend to upload/bind index buffers and call `DrawIndexed(...)`.
 
 ## Not Started
 
@@ -341,14 +344,14 @@ Status: completed (pending local build verification)
 - Phase 21 now drives camera projection mode/settings from `graphics.json` through renderer/runtime config chain.
 - Phase 22 now composes a config-driven `LookAt` view matrix with projection and adds an orbit-camera update path.
 - Phase 23 now introduces indexed/depth-tested geometry rendering, adds a minimal GLB test-mesh path, and removes automatic frame-count shutdown behavior.
-- Phase 24 removes the runtime frame-count shutdown setting again and replaces the animated triangle demo with one static cube rendered through DX11 depth buffering.
+- Phase 24 removes the runtime frame-count shutdown setting again and renders one static cube through an indexed DX11 vertex/index/depth-buffer path.
 
 ## Best Next Step
 
-Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the window shows one static cube over the configured clear color.
+Confirm Phase 24 visually: build, run `CookieRuntime`, verify it stays open until closed manually, and check that the window shows one recognizable static cube over the configured clear color.
 
 ## Suggested Commit Message
 
 ```text
-feat: render static cube baseline
+feat: render static indexed cube baseline
 ```

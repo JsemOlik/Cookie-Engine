@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string_view>
@@ -201,6 +202,11 @@ class RendererDX11Backend final : public IRendererBackend {
       vertex_buffer_ = nullptr;
     }
     vertex_buffer_capacity_bytes_ = 0;
+    if (index_buffer_ != nullptr) {
+      index_buffer_->Release();
+      index_buffer_ = nullptr;
+    }
+    index_buffer_capacity_bytes_ = 0;
     if (rasterizer_state_ != nullptr) {
       rasterizer_state_->Release();
       rasterizer_state_ = nullptr;
@@ -456,6 +462,36 @@ float4 PSMain(PSIn input) : SV_Target {
     return true;
   }
 
+  bool EnsureIndexBufferCapacity(std::size_t required_bytes) {
+    if (required_bytes == 0 || required_bytes > static_cast<std::size_t>(UINT_MAX)) {
+      return false;
+    }
+    if (index_buffer_ != nullptr && required_bytes <= index_buffer_capacity_bytes_) {
+      return true;
+    }
+
+    if (index_buffer_ != nullptr) {
+      index_buffer_->Release();
+      index_buffer_ = nullptr;
+      index_buffer_capacity_bytes_ = 0;
+    }
+
+    D3D11_BUFFER_DESC index_buffer_desc{};
+    index_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+    index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    index_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    index_buffer_desc.ByteWidth = static_cast<UINT>(required_bytes);
+
+    const HRESULT result =
+        device_->CreateBuffer(&index_buffer_desc, nullptr, &index_buffer_);
+    if (FAILED(result) || index_buffer_ == nullptr) {
+      return false;
+    }
+
+    index_buffer_capacity_bytes_ = required_bytes;
+    return true;
+  }
+
   void CopyMatrix16(float* destination, const Float4x4& source) {
     std::memcpy(destination, source.m, sizeof(source.m));
   }
@@ -495,6 +531,26 @@ float4 PSMain(PSIn input) : SV_Target {
     std::memcpy(mapped_vertex_buffer.pData, instance.vertices, required_bytes);
     device_context_->Unmap(vertex_buffer_, 0);
 
+    const bool has_indices =
+        instance.indices != nullptr && instance.index_count >= 3 &&
+        instance.index_count <= static_cast<std::size_t>(UINT_MAX);
+    if (has_indices) {
+      const std::size_t required_index_bytes =
+          instance.index_count * sizeof(std::uint32_t);
+      if (!EnsureIndexBufferCapacity(required_index_bytes)) {
+        return;
+      }
+
+      D3D11_MAPPED_SUBRESOURCE mapped_index_buffer{};
+      const HRESULT index_map_result = device_context_->Map(
+          index_buffer_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_index_buffer);
+      if (FAILED(index_map_result) || mapped_index_buffer.pData == nullptr) {
+        return;
+      }
+      std::memcpy(mapped_index_buffer.pData, instance.indices, required_index_bytes);
+      device_context_->Unmap(index_buffer_, 0);
+    }
+
     SceneConstantData constants{};
     CopyMatrix16(constants.model, instance.model_transform);
 
@@ -515,7 +571,12 @@ float4 PSMain(PSIn input) : SV_Target {
     device_context_->VSSetShader(vertex_shader_, nullptr, 0);
     device_context_->VSSetConstantBuffers(0, 1, &scene_constant_buffer_);
     device_context_->PSSetShader(pixel_shader_, nullptr, 0);
-    device_context_->Draw(static_cast<UINT>(instance.vertex_count), 0);
+    if (has_indices) {
+      device_context_->IASetIndexBuffer(index_buffer_, DXGI_FORMAT_R32_UINT, 0);
+      device_context_->DrawIndexed(static_cast<UINT>(instance.index_count), 0, 0);
+    } else {
+      device_context_->Draw(static_cast<UINT>(instance.vertex_count), 0);
+    }
   }
 #endif
 
@@ -534,8 +595,10 @@ float4 PSMain(PSIn input) : SV_Target {
   ID3D11InputLayout* input_layout_ = nullptr;
   ID3D11Buffer* scene_constant_buffer_ = nullptr;
   ID3D11Buffer* vertex_buffer_ = nullptr;
+  ID3D11Buffer* index_buffer_ = nullptr;
   ID3D11RasterizerState* rasterizer_state_ = nullptr;
   std::size_t vertex_buffer_capacity_bytes_ = 0;
+  std::size_t index_buffer_capacity_bytes_ = 0;
 #endif
 };
 

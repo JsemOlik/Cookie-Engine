@@ -197,7 +197,8 @@ int Application::Run() const {
 
   int frame_count = 0;
   cookie::renderer::SceneBuilder scene_builder;
-  const auto cube = cookie::renderer::MakeColoredCube();
+  const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices();
+  const auto cube_indices = cookie::renderer::MakeCubeIndices();
   const float aspect_ratio =
       (config_.window_height > 0)
           ? static_cast<float>(config_.window_width) /
@@ -220,7 +221,9 @@ int Application::Run() const {
 
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
-    scene_builder.AddMeshInstance(cube.data(), cube.size(), cube_transform);
+    scene_builder.AddIndexedMeshInstance(
+        cube_vertices.data(), cube_vertices.size(),
+        cube_indices.data(), cube_indices.size(), cube_transform);
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
@@ -262,7 +265,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 24 complete. Static cube render path wired.");
+  logger.Info("Phase 24 complete. Static indexed cube render path wired.");
 
   return 0;
 }
