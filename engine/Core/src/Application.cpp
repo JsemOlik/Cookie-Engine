@@ -117,6 +117,7 @@ int Application::Run() const {
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
   logger.Info("Camera mode: " + config_.camera_mode);
+  logger.Info("Demo albedo texture: " + config_.demo_albedo_texture);
   logger.Info("Fly camera controls: mouse look, WASD move, Q/E vertical, Shift speed.");
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
@@ -343,6 +344,15 @@ int Application::Run() const {
 
     renderer_backend_->Clear(config_.clear_color);
     scene_builder.Reset();
+    cookie::renderer::RenderMaterial demo_material{};
+    demo_material.albedo_texture_path = config_.demo_albedo_texture.c_str();
+    demo_material.tint[0] = 1.0f;
+    demo_material.tint[1] = 1.0f;
+    demo_material.tint[2] = 1.0f;
+    demo_material.tint[3] = 1.0f;
+    demo_material.use_albedo = true;
+    const std::size_t demo_material_index =
+        scene_builder.AddMaterial(demo_material);
     const float elapsed_seconds =
         std::chrono::duration<float>(now - frame_start_time).count();
     const float angle = elapsed_seconds;
@@ -356,7 +366,8 @@ int Application::Run() const {
         cookie::renderer::MultiplyTransforms(world, view_projection);
     scene_builder.AddIndexedMeshInstance(
         cube_vertices.data(), cube_vertices.size(),
-        cube_indices.data(), cube_indices.size(), cube_transform);
+        cube_indices.data(), cube_indices.size(), demo_material_index,
+        cube_transform);
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 
@@ -396,7 +407,7 @@ int Application::Run() const {
   logger.Info("Physics backend shut down successfully.");
   audio_backend_->Shutdown();
   logger.Info("Audio backend shut down successfully.");
-  logger.Info("Phase 24 complete. Static indexed cube render path wired.");
+  logger.Info("Phase 25 complete. Materials + textures baseline wired.");
 
   return 0;
 }

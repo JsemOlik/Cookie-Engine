@@ -18,6 +18,7 @@ if(WIN32)
       d3d11
       dxgi
       d3dcompiler
+      windowscodecs
   )
 endif()
 
@@ -44,6 +45,7 @@ if(WIN32)
       d3d11
       dxgi
       d3dcompiler
+      windowscodecs
   )
 endif()
 

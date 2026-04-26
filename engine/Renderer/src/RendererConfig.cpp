@@ -223,6 +223,12 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
     config.camera_mode = parsed_camera_mode;
   }
 
+  const std::string parsed_demo_albedo_texture =
+      ExtractStringValue(contents, "demo_albedo_texture");
+  if (!parsed_demo_albedo_texture.empty()) {
+    config.demo_albedo_texture = parsed_demo_albedo_texture;
+  }
+
   const int parsed_width = ExtractIntegerValue(contents, "window_width");
   if (parsed_width > 0) {
     config.window_width = parsed_width;

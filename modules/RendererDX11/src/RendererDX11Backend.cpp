@@ -1,11 +1,17 @@
 #include "Cookie/RendererDX11/RendererDX11Backend.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #if defined(_WIN32)
 
@@ -18,6 +24,7 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
+#include <wincodec.h>
 
 #endif
 
@@ -30,6 +37,13 @@ class RendererDX11Backend final : public IRendererBackend {
   bool Initialize(const RendererInitInfo& init_info) override {
     const auto hwnd = static_cast<HWND>(init_info.native_window_handle);
     if (hwnd == nullptr) {
+      return false;
+    }
+
+    const HRESULT co_init_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (SUCCEEDED(co_init_result)) {
+      com_initialized_ = true;
+    } else if (co_init_result != RPC_E_CHANGED_MODE) {
       return false;
     }
 
@@ -196,6 +210,7 @@ class RendererDX11Backend final : public IRendererBackend {
 
   void Shutdown() override {
 #if defined(_WIN32)
+    ReleaseTextureCache();
     submitted_scene_ = {};
     if (vertex_buffer_ != nullptr) {
       vertex_buffer_->Release();
@@ -251,6 +266,10 @@ class RendererDX11Backend final : public IRendererBackend {
       device_->Release();
       device_ = nullptr;
     }
+    if (com_initialized_) {
+      CoUninitialize();
+      com_initialized_ = false;
+    }
 #endif
     initialized_ = false;
   }
@@ -263,6 +282,9 @@ class RendererDX11Backend final : public IRendererBackend {
 #if defined(_WIN32)
   struct SceneConstantData {
     float world_view_projection[16];
+    float tint[4];
+    std::uint32_t use_albedo = 0;
+    float padding[3] = {0.0f, 0.0f, 0.0f};
   };
 
   bool CompileShader(const char* source, const char* entry_point,
@@ -296,34 +318,53 @@ class RendererDX11Backend final : public IRendererBackend {
     constexpr const char* vertex_shader_source = R"(
 cbuffer SceneConstants : register(b0) {
   row_major float4x4 u_world_view_projection;
+  float4 u_tint;
+  uint u_use_albedo;
+  float3 u_padding;
 };
 
 struct VSIn {
   float3 position : POSITION;
   float4 color : COLOR;
+  float2 uv : TEXCOORD0;
 };
 
 struct PSIn {
   float4 position : SV_Position;
   float4 color : COLOR;
+  float2 uv : TEXCOORD0;
 };
 
 PSIn VSMain(VSIn input) {
   PSIn output;
   output.position = mul(float4(input.position, 1.0f), u_world_view_projection);
   output.color = input.color;
+  output.uv = input.uv;
   return output;
 }
 )";
 
     constexpr const char* pixel_shader_source = R"(
+cbuffer SceneConstants : register(b0) {
+  row_major float4x4 u_world_view_projection;
+  float4 u_tint;
+  uint u_use_albedo;
+  float3 u_padding;
+};
+
+Texture2D u_albedo : register(t0);
+SamplerState u_sampler : register(s0);
+
 struct PSIn {
   float4 position : SV_Position;
   float4 color : COLOR;
+  float2 uv : TEXCOORD0;
 };
 
 float4 PSMain(PSIn input) : SV_Target {
-  return input.color;
+  float4 albedo = (u_use_albedo != 0) ? u_albedo.Sample(u_sampler, input.uv)
+                                      : float4(1.0f, 1.0f, 1.0f, 1.0f);
+  return input.color * u_tint * albedo;
 }
 )";
 
@@ -347,6 +388,9 @@ float4 PSMain(PSIn input) : SV_Target {
          D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
          static_cast<UINT>(offsetof(SceneVertex, color)),
+         D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
+         static_cast<UINT>(offsetof(SceneVertex, uv)),
          D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     const HRESULT input_layout_result = device_->CreateInputLayout(
@@ -386,6 +430,24 @@ float4 PSMain(PSIn input) : SV_Target {
     vertex_shader_blob->Release();
     vertex_shader_blob = nullptr;
     if (FAILED(constant_result) || scene_constant_buffer_ == nullptr) {
+      return false;
+    }
+
+    D3D11_SAMPLER_DESC sampler_desc{};
+    sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    sampler_desc.MinLOD = 0.0f;
+    sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+    const HRESULT sampler_result =
+        device_->CreateSamplerState(&sampler_desc, &texture_sampler_state_);
+    if (FAILED(sampler_result) || texture_sampler_state_ == nullptr) {
+      return false;
+    }
+
+    if (!CreateFallbackTexture()) {
       return false;
     }
 
@@ -492,6 +554,224 @@ float4 PSMain(PSIn input) : SV_Target {
     return true;
   }
 
+  void ReleaseTextureCache() {
+    for (auto& entry : texture_cache_) {
+      if (entry.second != nullptr) {
+        entry.second->Release();
+      }
+    }
+    texture_cache_.clear();
+    if (fallback_texture_srv_ != nullptr) {
+      fallback_texture_srv_->Release();
+      fallback_texture_srv_ = nullptr;
+    }
+    if (texture_sampler_state_ != nullptr) {
+      texture_sampler_state_->Release();
+      texture_sampler_state_ = nullptr;
+    }
+  }
+
+  bool CreateFallbackTexture() {
+    if (device_ == nullptr) {
+      return false;
+    }
+
+    const std::array<std::uint8_t, 16> pixels = {
+        255, 0, 255, 255,
+        20, 20, 20, 255,
+        20, 20, 20, 255,
+        255, 0, 255, 255,
+    };
+
+    D3D11_TEXTURE2D_DESC texture_desc{};
+    texture_desc.Width = 2;
+    texture_desc.Height = 2;
+    texture_desc.MipLevels = 1;
+    texture_desc.ArraySize = 1;
+    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture_desc.SampleDesc.Count = 1;
+    texture_desc.Usage = D3D11_USAGE_IMMUTABLE;
+    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA subresource{};
+    subresource.pSysMem = pixels.data();
+    subresource.SysMemPitch = 2 * 4;
+
+    ID3D11Texture2D* texture = nullptr;
+    const HRESULT texture_result =
+        device_->CreateTexture2D(&texture_desc, &subresource, &texture);
+    if (FAILED(texture_result) || texture == nullptr) {
+      return false;
+    }
+
+    const HRESULT view_result =
+        device_->CreateShaderResourceView(texture, nullptr, &fallback_texture_srv_);
+    texture->Release();
+    return SUCCEEDED(view_result) && fallback_texture_srv_ != nullptr;
+  }
+
+  bool DecodeTextureRgba8(const std::filesystem::path& texture_path,
+                          std::vector<std::uint8_t>& out_pixels,
+                          UINT& out_width,
+                          UINT& out_height) {
+    out_pixels.clear();
+    out_width = 0;
+    out_height = 0;
+    if (texture_path.empty()) {
+      return false;
+    }
+
+    IWICImagingFactory* factory = nullptr;
+    const HRESULT factory_result =
+        CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_PPV_ARGS(&factory));
+    if (FAILED(factory_result) || factory == nullptr) {
+      return false;
+    }
+
+    const std::wstring wide_path = texture_path.wstring();
+    IWICBitmapDecoder* decoder = nullptr;
+    const HRESULT decoder_result = factory->CreateDecoderFromFilename(
+        wide_path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad,
+        &decoder);
+    if (FAILED(decoder_result) || decoder == nullptr) {
+      factory->Release();
+      return false;
+    }
+
+    IWICBitmapFrameDecode* frame = nullptr;
+    const HRESULT frame_result = decoder->GetFrame(0, &frame);
+    if (FAILED(frame_result) || frame == nullptr) {
+      decoder->Release();
+      factory->Release();
+      return false;
+    }
+
+    IWICFormatConverter* converter = nullptr;
+    const HRESULT converter_result = factory->CreateFormatConverter(&converter);
+    if (FAILED(converter_result) || converter == nullptr) {
+      frame->Release();
+      decoder->Release();
+      factory->Release();
+      return false;
+    }
+
+    const HRESULT initialize_result = converter->Initialize(
+        frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr,
+        0.0, WICBitmapPaletteTypeCustom);
+    if (FAILED(initialize_result)) {
+      converter->Release();
+      frame->Release();
+      decoder->Release();
+      factory->Release();
+      return false;
+    }
+
+    UINT width = 0;
+    UINT height = 0;
+    if (FAILED(converter->GetSize(&width, &height)) || width == 0 || height == 0) {
+      converter->Release();
+      frame->Release();
+      decoder->Release();
+      factory->Release();
+      return false;
+    }
+
+    std::vector<std::uint8_t> pixels;
+    pixels.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
+                  4);
+    const HRESULT copy_result = converter->CopyPixels(
+        nullptr, width * 4, static_cast<UINT>(pixels.size()), pixels.data());
+
+    converter->Release();
+    frame->Release();
+    decoder->Release();
+    factory->Release();
+
+    if (FAILED(copy_result)) {
+      return false;
+    }
+
+    out_width = width;
+    out_height = height;
+    out_pixels = std::move(pixels);
+    return true;
+  }
+
+  ID3D11ShaderResourceView* ResolveAlbedoTexture(const RenderMaterial* material) {
+    if (fallback_texture_srv_ == nullptr) {
+      return nullptr;
+    }
+    if (material == nullptr || !material->use_albedo ||
+        material->albedo_texture_path == nullptr ||
+        material->albedo_texture_path[0] == '\0') {
+      return fallback_texture_srv_;
+    }
+
+    const std::string key(material->albedo_texture_path);
+    const auto cache_it = texture_cache_.find(key);
+    if (cache_it != texture_cache_.end() && cache_it->second != nullptr) {
+      return cache_it->second;
+    }
+
+    std::vector<std::uint8_t> pixels;
+    UINT width = 0;
+    UINT height = 0;
+    if (!DecodeTextureRgba8(std::filesystem::path(key), pixels, width, height)) {
+      if (warned_texture_paths_.insert(key).second) {
+        OutputDebugStringA(
+            ("Cookie DX11: failed to load texture '" + key +
+             "', using fallback texture.\n")
+                .c_str());
+      }
+      return fallback_texture_srv_;
+    }
+
+    D3D11_TEXTURE2D_DESC texture_desc{};
+    texture_desc.Width = width;
+    texture_desc.Height = height;
+    texture_desc.MipLevels = 1;
+    texture_desc.ArraySize = 1;
+    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture_desc.SampleDesc.Count = 1;
+    texture_desc.Usage = D3D11_USAGE_IMMUTABLE;
+    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA subresource{};
+    subresource.pSysMem = pixels.data();
+    subresource.SysMemPitch = width * 4;
+
+    ID3D11Texture2D* texture = nullptr;
+    const HRESULT texture_result =
+        device_->CreateTexture2D(&texture_desc, &subresource, &texture);
+    if (FAILED(texture_result) || texture == nullptr) {
+      if (warned_texture_paths_.insert(key).second) {
+        OutputDebugStringA(
+            ("Cookie DX11: failed to create GPU texture for '" + key +
+             "', using fallback texture.\n")
+                .c_str());
+      }
+      return fallback_texture_srv_;
+    }
+
+    ID3D11ShaderResourceView* srv = nullptr;
+    const HRESULT srv_result =
+        device_->CreateShaderResourceView(texture, nullptr, &srv);
+    texture->Release();
+    if (FAILED(srv_result) || srv == nullptr) {
+      if (warned_texture_paths_.insert(key).second) {
+        OutputDebugStringA(
+            ("Cookie DX11: failed to create SRV for '" + key +
+             "', using fallback texture.\n")
+                .c_str());
+      }
+      return fallback_texture_srv_;
+    }
+
+    texture_cache_[key] = srv;
+    return srv;
+  }
+
   void CopyMatrix16(float* destination, const Float4x4& source) {
     std::memcpy(destination, source.m, sizeof(source.m));
   }
@@ -507,11 +787,12 @@ float4 PSMain(PSIn input) : SV_Target {
     }
 
     for (std::size_t index = 0; index < submitted_scene_.instance_count; ++index) {
-      DrawSceneInstance(submitted_scene_.instances[index]);
+      DrawSceneInstance(submitted_scene_.instances[index], submitted_scene_);
     }
   }
 
-  void DrawSceneInstance(const RenderMeshInstance& instance) {
+  void DrawSceneInstance(const RenderMeshInstance& instance,
+                         const RenderScene& scene) {
     if (instance.vertices == nullptr || instance.vertex_count < 3 ||
         instance.vertex_count > static_cast<std::size_t>(UINT_MAX)) {
       return;
@@ -551,8 +832,27 @@ float4 PSMain(PSIn input) : SV_Target {
       device_context_->Unmap(index_buffer_, 0);
     }
 
+    const RenderMaterial* material = nullptr;
+    if (scene.materials != nullptr && scene.material_count > 0 &&
+        instance.material_index < scene.material_count) {
+      material = &scene.materials[instance.material_index];
+    }
+
     SceneConstantData constants{};
     CopyMatrix16(constants.world_view_projection, instance.model_transform);
+    if (material != nullptr) {
+      constants.tint[0] = material->tint[0];
+      constants.tint[1] = material->tint[1];
+      constants.tint[2] = material->tint[2];
+      constants.tint[3] = material->tint[3];
+      constants.use_albedo = material->use_albedo ? 1u : 0u;
+    } else {
+      constants.tint[0] = 1.0f;
+      constants.tint[1] = 1.0f;
+      constants.tint[2] = 1.0f;
+      constants.tint[3] = 1.0f;
+      constants.use_albedo = 0u;
+    }
 
     D3D11_MAPPED_SUBRESOURCE mapped_constants{};
     const HRESULT constant_map_result = device_context_->Map(
@@ -571,6 +871,10 @@ float4 PSMain(PSIn input) : SV_Target {
     device_context_->VSSetShader(vertex_shader_, nullptr, 0);
     device_context_->VSSetConstantBuffers(0, 1, &scene_constant_buffer_);
     device_context_->PSSetShader(pixel_shader_, nullptr, 0);
+    device_context_->PSSetConstantBuffers(0, 1, &scene_constant_buffer_);
+    ID3D11ShaderResourceView* albedo_texture = ResolveAlbedoTexture(material);
+    device_context_->PSSetShaderResources(0, 1, &albedo_texture);
+    device_context_->PSSetSamplers(0, 1, &texture_sampler_state_);
     if (has_indices) {
       device_context_->IASetIndexBuffer(index_buffer_, DXGI_FORMAT_R32_UINT, 0);
       device_context_->DrawIndexed(static_cast<UINT>(instance.index_count), 0, 0);
@@ -597,8 +901,13 @@ float4 PSMain(PSIn input) : SV_Target {
   ID3D11Buffer* vertex_buffer_ = nullptr;
   ID3D11Buffer* index_buffer_ = nullptr;
   ID3D11RasterizerState* rasterizer_state_ = nullptr;
+  ID3D11SamplerState* texture_sampler_state_ = nullptr;
+  ID3D11ShaderResourceView* fallback_texture_srv_ = nullptr;
   std::size_t vertex_buffer_capacity_bytes_ = 0;
   std::size_t index_buffer_capacity_bytes_ = 0;
+  std::unordered_map<std::string, ID3D11ShaderResourceView*> texture_cache_{};
+  std::unordered_set<std::string> warned_texture_paths_{};
+  bool com_initialized_ = false;
 #endif
 };
 
