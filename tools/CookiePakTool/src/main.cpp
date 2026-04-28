@@ -1,7 +1,6 @@
 #include <iostream>
-#include <string>
 
-#include "Cookie/Assets/AssetRegistry.h"
+#include "Cookie/Tools/PackageInspector.h"
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -9,15 +8,15 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  cookie::assets::AssetRegistry registry;
-  if (!registry.MountPackage(argv[1])) {
-    std::cout << "Failed to mount package: " << argv[1] << '\n';
+  const auto result = cookie::tools::InspectPackage(argv[1]);
+  if (!result.success) {
+    std::cout << result.error << '\n';
     return 2;
   }
 
-  std::cout << "Mounted packages: " << registry.GetMountedPackageCount() << '\n';
-  std::cout << "Asset count: " << registry.GetAssetCount() << '\n';
-  for (const auto& asset_id : registry.ListAssetIds()) {
+  std::cout << "Mounted packages: " << result.mounted_package_count << '\n';
+  std::cout << "Asset count: " << result.asset_ids.size() << '\n';
+  for (const auto& asset_id : result.asset_ids) {
     std::cout << " - " << asset_id << '\n';
   }
 

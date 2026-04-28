@@ -1,2 +1,3 @@
+add_subdirectory(CookieBuildPipeline)
 add_subdirectory(CookiePakTool)
 add_subdirectory(CookieExportTool)
