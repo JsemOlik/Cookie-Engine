@@ -132,10 +132,12 @@ bool LoadSceneAsset(const std::filesystem::path& scene_path, SceneAsset& out_sce
     }
 
     if (key == "mesh") {
+      current_object.has_mesh_renderer = true;
       current_object.mesh_renderer.mesh_asset_id = value;
       continue;
     }
     if (key == "material") {
+      current_object.has_mesh_renderer = true;
       current_object.mesh_renderer.material_asset_id = value;
       continue;
     }
@@ -152,16 +154,19 @@ bool LoadSceneAsset(const std::filesystem::path& scene_path, SceneAsset& out_sce
       continue;
     }
     if (key == "meshrenderer.mesh") {
+      current_object.has_mesh_renderer = true;
       current_object.mesh_renderer.mesh_asset_id = value;
       continue;
     }
     if (key == "meshrenderer.material") {
+      current_object.has_mesh_renderer = true;
       current_object.mesh_renderer.material_asset_id = value;
       continue;
     }
     if (key == "rigidbody.enabled") {
-      current_object.has_rigidbody = true;
-      current_object.rigidbody.enabled = (value == "true" || value == "1");
+      // Legacy migration behavior: rigidbody.enabled=false means component absent.
+      // true means component present.
+      current_object.has_rigidbody = (value == "true" || value == "1");
       continue;
     }
     if (key == "rigidbody.type") {
@@ -226,12 +231,12 @@ bool SaveSceneAsset(const std::filesystem::path& scene_path, const SceneAsset& s
     file << "transform.rotation: "
          << Float3ToString(object.transform.rotation_euler_degrees) << "\n";
     file << "transform.scale: " << Float3ToString(object.transform.scale) << "\n";
-    file << "meshrenderer.mesh: " << object.mesh_renderer.mesh_asset_id << "\n";
-    file << "meshrenderer.material: " << object.mesh_renderer.material_asset_id
-         << "\n";
-    if (object.has_rigidbody) {
-      file << "rigidbody.enabled: " << (object.rigidbody.enabled ? "true" : "false")
+    if (object.has_mesh_renderer) {
+      file << "meshrenderer.mesh: " << object.mesh_renderer.mesh_asset_id << "\n";
+      file << "meshrenderer.material: " << object.mesh_renderer.material_asset_id
            << "\n";
+    }
+    if (object.has_rigidbody) {
       file << "rigidbody.type: " << object.rigidbody.body_type << "\n";
       file << "rigidbody.mass: " << object.rigidbody.mass << "\n";
     }
@@ -248,8 +253,10 @@ std::vector<std::string> ExtractSceneDependencies(const SceneAsset& scene) {
     AddDependencyIfSet(dependencies, nested_scene);
   }
   for (const auto& object : scene.objects) {
-    AddDependencyIfSet(dependencies, object.mesh_renderer.mesh_asset_id);
-    AddDependencyIfSet(dependencies, object.mesh_renderer.material_asset_id);
+    if (object.has_mesh_renderer) {
+      AddDependencyIfSet(dependencies, object.mesh_renderer.mesh_asset_id);
+      AddDependencyIfSet(dependencies, object.mesh_renderer.material_asset_id);
+    }
   }
 
   std::sort(dependencies.begin(), dependencies.end());

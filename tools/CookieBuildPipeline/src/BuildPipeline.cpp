@@ -416,7 +416,17 @@ bool BuildCookedRegistryArtifact(
       }
     }
     for (const auto& object : scene_asset.objects) {
-      if (!object.mesh_renderer.mesh_asset_id.empty()) {
+      if (object.has_mesh_renderer &&
+          object.mesh_renderer.mesh_asset_id.empty()) {
+        AddError(result, "Scene mesh reference missing: " + record.asset_id +
+                             " object=" + object.name + " mesh=<empty>");
+      }
+      if (object.has_mesh_renderer &&
+          object.mesh_renderer.material_asset_id.empty()) {
+        AddError(result, "Scene material reference missing: " + record.asset_id +
+                             " object=" + object.name + " material=<empty>");
+      }
+      if (object.has_mesh_renderer && !object.mesh_renderer.mesh_asset_id.empty()) {
         const auto it = records_by_id.find(object.mesh_renderer.mesh_asset_id);
         if (it == records_by_id.end()) {
           AddError(result, "Scene mesh reference missing: " + record.asset_id +
@@ -429,7 +439,8 @@ bool BuildCookedRegistryArtifact(
                                it->second.type);
         }
       }
-      if (!object.mesh_renderer.material_asset_id.empty()) {
+      if (object.has_mesh_renderer &&
+          !object.mesh_renderer.material_asset_id.empty()) {
         const auto it = records_by_id.find(object.mesh_renderer.material_asset_id);
         if (it == records_by_id.end()) {
           AddError(result, "Scene material reference missing: " + record.asset_id +

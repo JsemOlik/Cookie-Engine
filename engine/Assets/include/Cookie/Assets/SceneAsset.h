@@ -19,7 +19,6 @@ struct MeshRendererComponent {
 };
 
 struct RigidBodyStubComponent {
-  bool enabled = false;
   std::string body_type = "dynamic";
   float mass = 1.0f;
 };
@@ -27,6 +26,7 @@ struct RigidBodyStubComponent {
 struct SceneAssetObject {
   std::string name;
   TransformComponent transform;
+  bool has_mesh_renderer = false;
   MeshRendererComponent mesh_renderer;
   bool has_rigidbody = false;
   RigidBodyStubComponent rigidbody;

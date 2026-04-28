@@ -23,6 +23,7 @@ target_link_libraries(CookieEditor
     Qt6::Widgets
     cookie_core
     cookie_renderer
+    cookie_renderer_dx11
     cookie_assets
     cookie_tools_pipeline
 )

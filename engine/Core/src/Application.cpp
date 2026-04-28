@@ -67,10 +67,7 @@ Vec3 Cross(const Vec3& a, const Vec3& b) {
 
 std::filesystem::path ResolveAssetPathFromId(
     const cookie::assets::AssetRegistry& assets,
-    const StartupPaths& paths, std::string_view asset_id) {
-  if (const auto cooked_record = assets.ResolveCookedRecord(asset_id)) {
-    return paths.project_root / "content" / cooked_record->runtime_relative_path;
-  }
+    const StartupPaths& /*paths*/, std::string_view asset_id) {
   return assets.ResolveAssetPath(asset_id);
 }
 
@@ -421,6 +418,11 @@ int Application::Run() const {
   };
   std::vector<LoadedScenePrimitive> loaded_scene_primitives;
   for (const auto& object : startup_scene_objects) {
+    if (!object.has_mesh_renderer) {
+      logger.Info("Scene object '" + object.name +
+                  "' has no MeshRenderer component; skipping render.");
+      continue;
+    }
     if (!ValidateAssetType(
             assets, object.mesh_renderer.mesh_asset_id, {"Mesh", "Model"}, logger,
             "scene mesh")) {
@@ -479,14 +481,28 @@ int Application::Run() const {
       loaded.vertices = primitive.vertices;
       loaded.indices = primitive.indices;
       loaded.albedo_texture_path = resolved_albedo_texture;
+      const auto rotation =
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeXRotationTransform(
+                  object.transform.rotation_euler_degrees[0] *
+                  0.017453292519943295769f),
+              cookie::renderer::MultiplyTransforms(
+                  cookie::renderer::MakeYRotationTransform(
+                      object.transform.rotation_euler_degrees[1] *
+                      0.017453292519943295769f),
+                  cookie::renderer::MakeZRotationTransform(
+                      object.transform.rotation_euler_degrees[2] *
+                      0.017453292519943295769f)));
       loaded.object_transform =
           cookie::renderer::MultiplyTransforms(
               cookie::renderer::MakeScaleTransform(
                   object.transform.scale[0], object.transform.scale[1],
                   object.transform.scale[2]),
-              cookie::renderer::MakeTranslationTransform(
-                  object.transform.position[0], object.transform.position[1],
-                  object.transform.position[2]));
+              cookie::renderer::MultiplyTransforms(
+                  rotation, cookie::renderer::MakeTranslationTransform(
+                                object.transform.position[0],
+                                object.transform.position[1],
+                                object.transform.position[2])));
       loaded_scene_primitives.push_back(std::move(loaded));
     }
   }
@@ -498,6 +514,7 @@ int Application::Run() const {
               std::to_string(loaded_scene_primitives.size()));
   const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices();
   const auto cube_indices = cookie::renderer::MakeCubeIndices();
+  bool warned_startup_scene_no_renderables = false;
   const float aspect_ratio =
       (config_.window_height > 0)
           ? static_cast<float>(config_.window_width) /
@@ -644,10 +661,11 @@ int Application::Run() const {
           cube_vertices.data(), cube_vertices.size(), cube_indices.data(),
           cube_indices.size(), demo_material_index, mesh_transform);
     } else {
-      logger.Error(
-          "Startup scene was configured but produced no renderable primitives.");
-      window->RequestClose();
-      break;
+      if (!warned_startup_scene_no_renderables) {
+        logger.Info(
+            "Startup scene has no renderable MeshRenderer primitives; drawing clear pass only.");
+        warned_startup_scene_no_renderables = true;
+      }
     }
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();

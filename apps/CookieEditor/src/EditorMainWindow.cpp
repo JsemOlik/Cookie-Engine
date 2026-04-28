@@ -1,10 +1,10 @@
 #include "Cookie/Editor/EditorMainWindow.h"
 
 #include <QComboBox>
-#include <QCheckBox>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -16,21 +16,32 @@
 #include <QStatusBar>
 #include <QString>
 #include <QTextEdit>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 
-#include <vector>
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <filesystem>
+#include <initializer_list>
+#include <string>
+#include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "Cookie/Assets/AssetMeta.h"
+#include "Cookie/Assets/MaterialAsset.h"
 #include "Cookie/Assets/SceneAsset.h"
 #include "Cookie/Core/GameConfig.h"
+#include "Cookie/Renderer/SceneBuilder.h"
+#include "Cookie/Renderer/Transform.h"
+#include "Cookie/RendererDX11/RendererDX11Backend.h"
 #include "Cookie/Tools/BuildPipeline.h"
 
 namespace {
+
+constexpr float kDegreesToRadians = 0.017453292519943295769f;
 
 QDockWidget* CreateDock(
     const QString& title, QWidget* content, QWidget* parent) {
@@ -38,12 +49,6 @@ QDockWidget* CreateDock(
   dock->setAllowedAreas(Qt::AllDockWidgetAreas);
   dock->setWidget(content);
   return dock;
-}
-
-QWidget* CreatePlaceholderPanel(const QString& label_text, QWidget* parent) {
-  auto* label = new QLabel(label_text, parent);
-  label->setAlignment(Qt::AlignCenter);
-  return label;
 }
 
 QString BuildMetaSummary(const cookie::assets::DiscoveredAsset& asset) {
@@ -174,6 +179,39 @@ std::filesystem::path ResolveEditorProjectRoot(
   return std::filesystem::current_path();
 }
 
+bool IsTypeOneOf(const std::string& type,
+                 std::initializer_list<std::string_view> allowed_types) {
+  for (const auto allowed : allowed_types) {
+    if (type == allowed) {
+      return true;
+    }
+  }
+  return false;
+}
+
+cookie::renderer::Float4x4 BuildObjectTransform(
+    const cookie::assets::SceneAssetObject& object) {
+  const auto rotation =
+      cookie::renderer::MultiplyTransforms(
+          cookie::renderer::MakeXRotationTransform(
+              object.transform.rotation_euler_degrees[0] * kDegreesToRadians),
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeYRotationTransform(
+                  object.transform.rotation_euler_degrees[1] * kDegreesToRadians),
+              cookie::renderer::MakeZRotationTransform(
+                  object.transform.rotation_euler_degrees[2] *
+                  kDegreesToRadians)));
+  return cookie::renderer::MultiplyTransforms(
+      cookie::renderer::MakeScaleTransform(
+          object.transform.scale[0], object.transform.scale[1],
+          object.transform.scale[2]),
+      cookie::renderer::MultiplyTransforms(
+          rotation,
+          cookie::renderer::MakeTranslationTransform(
+              object.transform.position[0], object.transform.position[1],
+              object.transform.position[2])));
+}
+
 } // namespace
 
 EditorMainWindow::EditorMainWindow(
@@ -183,30 +221,42 @@ EditorMainWindow::EditorMainWindow(
   setWindowTitle("Cookie Editor");
   resize(1600, 900);
 
-  auto* scene_viewport =
-      new QTextEdit("Scene Viewport Placeholder\n\n(Phase 6 skeleton)");
-  scene_viewport->setReadOnly(true);
-  setCentralWidget(scene_viewport);
+  viewport_widget_ = new QWidget(this);
+  viewport_widget_->setAttribute(Qt::WA_NativeWindow, true);
+  viewport_widget_->setAutoFillBackground(true);
+  viewport_widget_->setStyleSheet("background-color: #11142A;");
+  setCentralWidget(viewport_widget_);
 
   assets_list_ = new QListWidget(this);
   scene_outliner_list_ = new QListWidget(this);
   meta_inspector_ = new QTextEdit(this);
   meta_inspector_->setReadOnly(true);
   startup_scene_selector_ = new QComboBox(this);
+  component_type_selector_ = new QComboBox(this);
+  component_type_selector_->addItem("MeshRenderer");
+  component_type_selector_->addItem("RigidBody");
+  add_component_button_ = new QPushButton("Add Component", this);
+  remove_component_button_ = new QPushButton("Remove Component", this);
+
   object_name_input_ = new QLineEdit(this);
   pos_x_input_ = new QLineEdit(this);
   pos_y_input_ = new QLineEdit(this);
   pos_z_input_ = new QLineEdit(this);
+  rot_x_input_ = new QLineEdit(this);
+  rot_y_input_ = new QLineEdit(this);
+  rot_z_input_ = new QLineEdit(this);
   scale_x_input_ = new QLineEdit(this);
   scale_y_input_ = new QLineEdit(this);
   scale_z_input_ = new QLineEdit(this);
   mesh_asset_id_input_ = new QLineEdit(this);
   material_asset_id_input_ = new QLineEdit(this);
-  rigidbody_enabled_input_ = new QCheckBox(this);
   rigidbody_type_input_ = new QLineEdit(this);
   rigidbody_mass_input_ = new QLineEdit(this);
   apply_object_button_ = new QPushButton("Apply Object", this);
   save_scene_button_ = new QPushButton("Save Scene", this);
+
+  mesh_renderer_status_label_ = new QLabel("MeshRenderer: not added", this);
+  rigidbody_status_label_ = new QLabel("RigidBody: not added", this);
 
   connect(assets_list_, &QListWidget::currentRowChanged, this,
           [this](const int index) { UpdateMetaInspector(index); });
@@ -231,6 +281,10 @@ EditorMainWindow::EditorMainWindow(
           [this]() { ApplyInspectorToSelectedObject(); });
   connect(save_scene_button_, &QPushButton::clicked, this,
           [this]() { SaveActiveScene(); });
+  connect(add_component_button_, &QPushButton::clicked, this,
+          [this]() { AddComponentToSelectedObject(); });
+  connect(remove_component_button_, &QPushButton::clicked, this,
+          [this]() { RemoveComponentFromSelectedObject(); });
 
   auto* build_panel = new QWidget(this);
   auto* build_layout = new QVBoxLayout(build_panel);
@@ -238,8 +292,7 @@ EditorMainWindow::EditorMainWindow(
   game_name_input_ = new QLineEdit("MyGame", build_panel);
   const auto detected_runtime_build_dir = DetectDefaultRuntimeBuildDir(project_root_);
   runtime_build_dir_input_ =
-      new QLineEdit(QString::fromStdString(
-          detected_runtime_build_dir.string()),
+      new QLineEdit(QString::fromStdString(detected_runtime_build_dir.string()),
                     build_panel);
   export_parent_input_ = new QLineEdit(
       QString::fromStdString((project_root_ / "out" / "ship").string()),
@@ -358,6 +411,7 @@ EditorMainWindow::EditorMainWindow(
     RefreshSceneOutliner();
     scene_outliner_list_->setCurrentRow(
         static_cast<int>(active_scene_.objects.size() - 1));
+    RebuildViewportSceneCache();
     statusBar()->showMessage("Added scene object.");
   });
   connect(rename_object_button, &QPushButton::clicked, this, [this]() {
@@ -391,29 +445,52 @@ EditorMainWindow::EditorMainWindow(
     if (next >= 0) {
       scene_outliner_list_->setCurrentRow(next);
     }
+    RebuildViewportSceneCache();
     statusBar()->showMessage("Removed scene object.");
   });
 
   auto* inspector_panel = new QWidget(this);
-  auto* inspector_layout = new QFormLayout(inspector_panel);
-  inspector_layout->addRow("Name", object_name_input_);
-  inspector_layout->addRow("Position X", pos_x_input_);
-  inspector_layout->addRow("Position Y", pos_y_input_);
-  inspector_layout->addRow("Position Z", pos_z_input_);
-  inspector_layout->addRow("Scale X", scale_x_input_);
-  inspector_layout->addRow("Scale Y", scale_y_input_);
-  inspector_layout->addRow("Scale Z", scale_z_input_);
-  inspector_layout->addRow("Mesh AssetId", mesh_asset_id_input_);
-  inspector_layout->addRow("Material AssetId", material_asset_id_input_);
-  inspector_layout->addRow("RigidBody Enabled", rigidbody_enabled_input_);
-  inspector_layout->addRow("RigidBody Type", rigidbody_type_input_);
-  inspector_layout->addRow("RigidBody Mass", rigidbody_mass_input_);
-  inspector_layout->addRow(apply_object_button_);
+  auto* inspector_layout = new QVBoxLayout(inspector_panel);
+
+  auto* object_fields = new QFormLayout();
+  object_fields->addRow("Name", object_name_input_);
+  object_fields->addRow("Position X", pos_x_input_);
+  object_fields->addRow("Position Y", pos_y_input_);
+  object_fields->addRow("Position Z", pos_z_input_);
+  object_fields->addRow("Rotation X", rot_x_input_);
+  object_fields->addRow("Rotation Y", rot_y_input_);
+  object_fields->addRow("Rotation Z", rot_z_input_);
+  object_fields->addRow("Scale X", scale_x_input_);
+  object_fields->addRow("Scale Y", scale_y_input_);
+  object_fields->addRow("Scale Z", scale_z_input_);
+  inspector_layout->addLayout(object_fields);
+
+  auto* component_actions = new QHBoxLayout();
+  component_actions->addWidget(component_type_selector_);
+  component_actions->addWidget(add_component_button_);
+  component_actions->addWidget(remove_component_button_);
+  inspector_layout->addLayout(component_actions);
+
+  mesh_renderer_group_ = new QGroupBox("MeshRenderer", inspector_panel);
+  auto* mesh_layout = new QFormLayout(mesh_renderer_group_);
+  mesh_layout->addRow("Mesh AssetId", mesh_asset_id_input_);
+  mesh_layout->addRow("Material AssetId", material_asset_id_input_);
+
+  rigidbody_group_ = new QGroupBox("RigidBody", inspector_panel);
+  auto* rigid_layout = new QFormLayout(rigidbody_group_);
+  rigid_layout->addRow("RigidBody Type", rigidbody_type_input_);
+  rigid_layout->addRow("RigidBody Mass", rigidbody_mass_input_);
+
+  inspector_layout->addWidget(mesh_renderer_status_label_);
+  inspector_layout->addWidget(mesh_renderer_group_);
+  inspector_layout->addWidget(rigidbody_status_label_);
+  inspector_layout->addWidget(rigidbody_group_);
+  inspector_layout->addWidget(apply_object_button_);
 
   addDockWidget(Qt::LeftDockWidgetArea,
                 CreateDock(
                     "Hierarchy",
-                    CreatePlaceholderPanel("Hierarchy Placeholder", this), this));
+                    new QLabel("Hierarchy Placeholder", this), this));
   addDockWidget(Qt::RightDockWidgetArea,
                 CreateDock("Meta Inspector", meta_inspector_, this));
   addDockWidget(Qt::RightDockWidgetArea,
@@ -424,10 +501,6 @@ EditorMainWindow::EditorMainWindow(
                 CreateDock("Build/Export", build_panel, this));
   addDockWidget(Qt::LeftDockWidgetArea,
                 CreateDock("Scene Outliner", scene_outliner_panel, this));
-  addDockWidget(Qt::RightDockWidgetArea,
-                CreateDock(
-                    "Game Viewport",
-                    CreatePlaceholderPanel("Game Viewport Placeholder", this), this));
 
   auto* file_menu = menuBar()->addMenu("&File");
   file_menu->addAction("E&xit", this, &QWidget::close);
@@ -439,8 +512,16 @@ EditorMainWindow::EditorMainWindow(
   LoadActiveScene();
   RefreshSceneOutliner();
   RefreshInspector();
+
+  viewport_timer_ = new QTimer(this);
+  connect(viewport_timer_, &QTimer::timeout, this,
+          [this]() { RenderViewportFrame(); });
+  viewport_timer_->start(16);
+  connect(qApp, &QCoreApplication::aboutToQuit, this,
+          [this]() { ShutdownViewportRenderer(); });
+
   statusBar()->showMessage(
-      "Cookie Editor Phase 24B shell loaded (project root: " +
+      "Cookie Editor Phase 24D loaded (project root: " +
       QString::fromStdString(project_root_.string()) + ")");
 }
 
@@ -513,7 +594,14 @@ void EditorMainWindow::RefreshSceneOutliner() {
   }
 
   for (const auto& object : active_scene_.objects) {
-    scene_outliner_list_->addItem(QString::fromStdString(object.name));
+    QString label = QString::fromStdString(object.name);
+    if (object.has_mesh_renderer) {
+      label += " [MeshRenderer]";
+    }
+    if (object.has_rigidbody) {
+      label += " [RigidBody]";
+    }
+    scene_outliner_list_->addItem(label);
   }
 }
 
@@ -546,6 +634,7 @@ void EditorMainWindow::LoadActiveScene() {
     return;
   }
   active_scene_path_ = scene_path;
+  RebuildViewportSceneCache();
 }
 
 void EditorMainWindow::RefreshInspector() {
@@ -555,31 +644,60 @@ void EditorMainWindow::RefreshInspector() {
     pos_x_input_->setText("");
     pos_y_input_->setText("");
     pos_z_input_->setText("");
+    rot_x_input_->setText("");
+    rot_y_input_->setText("");
+    rot_z_input_->setText("");
     scale_x_input_->setText("");
     scale_y_input_->setText("");
     scale_z_input_->setText("");
     mesh_asset_id_input_->setText("");
     material_asset_id_input_->setText("");
-    rigidbody_enabled_input_->setChecked(false);
     rigidbody_type_input_->setText("");
     rigidbody_mass_input_->setText("");
+    mesh_renderer_status_label_->setText("MeshRenderer: not added");
+    rigidbody_status_label_->setText("RigidBody: not added");
+    mesh_renderer_group_->setVisible(false);
+    rigidbody_group_->setVisible(false);
     return;
   }
+
   const auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
   object_name_input_->setText(QString::fromStdString(object.name));
   pos_x_input_->setText(QString::number(object.transform.position[0]));
   pos_y_input_->setText(QString::number(object.transform.position[1]));
   pos_z_input_->setText(QString::number(object.transform.position[2]));
+  rot_x_input_->setText(QString::number(object.transform.rotation_euler_degrees[0]));
+  rot_y_input_->setText(QString::number(object.transform.rotation_euler_degrees[1]));
+  rot_z_input_->setText(QString::number(object.transform.rotation_euler_degrees[2]));
   scale_x_input_->setText(QString::number(object.transform.scale[0]));
   scale_y_input_->setText(QString::number(object.transform.scale[1]));
   scale_z_input_->setText(QString::number(object.transform.scale[2]));
-  mesh_asset_id_input_->setText(
-      QString::fromStdString(object.mesh_renderer.mesh_asset_id));
-  material_asset_id_input_->setText(
-      QString::fromStdString(object.mesh_renderer.material_asset_id));
-  rigidbody_enabled_input_->setChecked(object.has_rigidbody && object.rigidbody.enabled);
-  rigidbody_type_input_->setText(QString::fromStdString(object.rigidbody.body_type));
-  rigidbody_mass_input_->setText(QString::number(object.rigidbody.mass));
+
+  if (object.has_mesh_renderer) {
+    mesh_renderer_group_->setVisible(true);
+    mesh_renderer_status_label_->setText("MeshRenderer: added");
+    mesh_asset_id_input_->setText(
+        QString::fromStdString(object.mesh_renderer.mesh_asset_id));
+    material_asset_id_input_->setText(
+        QString::fromStdString(object.mesh_renderer.material_asset_id));
+  } else {
+    mesh_renderer_group_->setVisible(false);
+    mesh_renderer_status_label_->setText("MeshRenderer: not added");
+    mesh_asset_id_input_->setText("");
+    material_asset_id_input_->setText("");
+  }
+
+  if (object.has_rigidbody) {
+    rigidbody_group_->setVisible(true);
+    rigidbody_status_label_->setText("RigidBody: added");
+    rigidbody_type_input_->setText(QString::fromStdString(object.rigidbody.body_type));
+    rigidbody_mass_input_->setText(QString::number(object.rigidbody.mass));
+  } else {
+    rigidbody_group_->setVisible(false);
+    rigidbody_status_label_->setText("RigidBody: not added");
+    rigidbody_type_input_->setText("");
+    rigidbody_mass_input_->setText("");
+  }
 }
 
 void EditorMainWindow::ApplyInspectorToSelectedObject() {
@@ -587,6 +705,7 @@ void EditorMainWindow::ApplyInspectorToSelectedObject() {
   if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
     return;
   }
+
   auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
   object.name = object_name_input_->text().trimmed().toStdString();
   if (object.name.empty()) {
@@ -596,22 +715,79 @@ void EditorMainWindow::ApplyInspectorToSelectedObject() {
   TryParseFloat(pos_x_input_->text(), object.transform.position[0]);
   TryParseFloat(pos_y_input_->text(), object.transform.position[1]);
   TryParseFloat(pos_z_input_->text(), object.transform.position[2]);
+  TryParseFloat(rot_x_input_->text(), object.transform.rotation_euler_degrees[0]);
+  TryParseFloat(rot_y_input_->text(), object.transform.rotation_euler_degrees[1]);
+  TryParseFloat(rot_z_input_->text(), object.transform.rotation_euler_degrees[2]);
   TryParseFloat(scale_x_input_->text(), object.transform.scale[0]);
   TryParseFloat(scale_y_input_->text(), object.transform.scale[1]);
   TryParseFloat(scale_z_input_->text(), object.transform.scale[2]);
 
-  object.mesh_renderer.mesh_asset_id =
-      mesh_asset_id_input_->text().trimmed().toStdString();
-  object.mesh_renderer.material_asset_id =
-      material_asset_id_input_->text().trimmed().toStdString();
-  object.has_rigidbody = rigidbody_enabled_input_->isChecked();
-  object.rigidbody.enabled = rigidbody_enabled_input_->isChecked();
-  object.rigidbody.body_type = rigidbody_type_input_->text().trimmed().toStdString();
-  TryParseFloat(rigidbody_mass_input_->text(), object.rigidbody.mass);
+  if (object.has_mesh_renderer) {
+    object.mesh_renderer.mesh_asset_id =
+        mesh_asset_id_input_->text().trimmed().toStdString();
+    object.mesh_renderer.material_asset_id =
+        material_asset_id_input_->text().trimmed().toStdString();
+  }
+
+  if (object.has_rigidbody) {
+    object.rigidbody.body_type = rigidbody_type_input_->text().trimmed().toStdString();
+    if (object.rigidbody.body_type.empty()) {
+      object.rigidbody.body_type = "dynamic";
+    }
+    TryParseFloat(rigidbody_mass_input_->text(), object.rigidbody.mass);
+  }
 
   RefreshSceneOutliner();
   scene_outliner_list_->setCurrentRow(index);
+  RebuildViewportSceneCache();
   statusBar()->showMessage("Applied object edits.");
+}
+
+void EditorMainWindow::AddComponentToSelectedObject() {
+  const int index = CurrentSceneObjectIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+    return;
+  }
+
+  auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
+  const std::string component = component_type_selector_->currentText().toStdString();
+  if (component == "MeshRenderer") {
+    object.has_mesh_renderer = true;
+  } else if (component == "RigidBody") {
+    object.has_rigidbody = true;
+    if (object.rigidbody.body_type.empty()) {
+      object.rigidbody.body_type = "dynamic";
+    }
+  }
+
+  RefreshSceneOutliner();
+  scene_outliner_list_->setCurrentRow(index);
+  RefreshInspector();
+  RebuildViewportSceneCache();
+  statusBar()->showMessage("Added component: " + component_type_selector_->currentText());
+}
+
+void EditorMainWindow::RemoveComponentFromSelectedObject() {
+  const int index = CurrentSceneObjectIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+    return;
+  }
+
+  auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
+  const std::string component = component_type_selector_->currentText().toStdString();
+  if (component == "MeshRenderer") {
+    object.has_mesh_renderer = false;
+    object.mesh_renderer = {};
+  } else if (component == "RigidBody") {
+    object.has_rigidbody = false;
+    object.rigidbody = {};
+  }
+
+  RefreshSceneOutliner();
+  scene_outliner_list_->setCurrentRow(index);
+  RefreshInspector();
+  RebuildViewportSceneCache();
+  statusBar()->showMessage("Removed component: " + component_type_selector_->currentText());
 }
 
 void EditorMainWindow::SaveActiveScene() {
@@ -626,6 +802,158 @@ void EditorMainWindow::SaveActiveScene() {
         QString("Failed to save scene:\n") + QString::fromStdString(save_error));
     return;
   }
+  RebuildViewportSceneCache();
   statusBar()->showMessage(
       "Saved scene: " + QString::fromStdString(active_scene_path_.string()));
+}
+
+void EditorMainWindow::EnsureViewportRendererInitialized() {
+  if (viewport_renderer_initialized_) {
+    return;
+  }
+  if (viewport_widget_ == nullptr) {
+    return;
+  }
+
+  viewport_renderer_ = cookie::renderer::dx11::CreateRendererDX11Backend();
+  if (!viewport_renderer_) {
+    statusBar()->showMessage("Viewport renderer creation failed.");
+    return;
+  }
+
+  const WId window_id = viewport_widget_->winId();
+  cookie::renderer::RendererInitInfo init{};
+  init.native_window_handle = reinterpret_cast<void*>(window_id);
+  init.window_width = std::max(1, viewport_widget_->width());
+  init.window_height = std::max(1, viewport_widget_->height());
+  init.enable_vsync = true;
+  if (!viewport_renderer_->Initialize(init)) {
+    viewport_renderer_.reset();
+    statusBar()->showMessage("Viewport renderer initialization failed.");
+    return;
+  }
+
+  viewport_renderer_initialized_ = true;
+  statusBar()->showMessage("Viewport renderer initialized.");
+}
+
+void EditorMainWindow::ShutdownViewportRenderer() {
+  if (viewport_renderer_) {
+    viewport_renderer_->Shutdown();
+    viewport_renderer_.reset();
+  }
+  viewport_renderer_initialized_ = false;
+}
+
+void EditorMainWindow::RebuildViewportSceneCache() {
+  viewport_mesh_cache_.clear();
+  viewport_mesh_textures_.clear();
+  viewport_mesh_transforms_.clear();
+
+  for (const auto& object : active_scene_.objects) {
+    if (!object.has_mesh_renderer) {
+      continue;
+    }
+
+    const auto mesh_record = asset_registry_.ResolveCookedRecord(
+        object.mesh_renderer.mesh_asset_id);
+    if (!mesh_record.has_value() ||
+        !IsTypeOneOf(mesh_record->type, {"Mesh", "Model"})) {
+      continue;
+    }
+    const auto material_record = asset_registry_.ResolveCookedRecord(
+        object.mesh_renderer.material_asset_id);
+    if (!material_record.has_value() ||
+        !IsTypeOneOf(material_record->type, {"Material", "MaterialAsset"})) {
+      continue;
+    }
+
+    const auto mesh_path =
+        asset_registry_.ResolveAssetPath(object.mesh_renderer.mesh_asset_id);
+    const auto material_path =
+        asset_registry_.ResolveAssetPath(object.mesh_renderer.material_asset_id);
+    if (mesh_path.empty() || material_path.empty()) {
+      continue;
+    }
+
+    cookie::assets::MaterialAsset material_asset;
+    if (!cookie::assets::LoadMaterialAsset(material_path, material_asset, nullptr)) {
+      continue;
+    }
+
+    std::string albedo_texture;
+    if (!material_asset.albedo_asset_id.empty()) {
+      const auto texture_path =
+          asset_registry_.ResolveAssetPath(material_asset.albedo_asset_id);
+      if (!texture_path.empty()) {
+        albedo_texture = texture_path.string();
+      }
+    }
+
+    cookie::renderer::ImportedMesh imported_mesh;
+    if (!cookie::renderer::LoadMeshFromPath(mesh_path, imported_mesh, nullptr)) {
+      continue;
+    }
+
+    for (const auto& primitive : imported_mesh.primitives) {
+      viewport_mesh_cache_.push_back(primitive);
+      viewport_mesh_textures_.push_back(albedo_texture);
+      viewport_mesh_transforms_.push_back(BuildObjectTransform(object));
+    }
+  }
+}
+
+void EditorMainWindow::RenderViewportFrame() {
+  EnsureViewportRendererInitialized();
+  if (!viewport_renderer_initialized_ || !viewport_renderer_) {
+    return;
+  }
+
+  if (!viewport_renderer_->BeginFrame()) {
+    return;
+  }
+
+  viewport_renderer_->Clear({0.07f, 0.08f, 0.16f, 1.0f});
+
+  cookie::renderer::SceneBuilder scene_builder;
+  const float aspect_ratio =
+      static_cast<float>(std::max(1, viewport_widget_->width())) /
+      static_cast<float>(std::max(1, viewport_widget_->height()));
+  const auto projection = cookie::renderer::MakePerspectiveProjection(
+      1.04719755f, aspect_ratio, 0.01f, 100.0f);
+  const auto view = cookie::renderer::MakeLookAtView(
+      4.0f, 3.0f, -7.0f,
+      0.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f);
+  const auto view_projection = cookie::renderer::MultiplyTransforms(view, projection);
+
+  for (std::size_t i = 0; i < viewport_mesh_cache_.size(); ++i) {
+    cookie::renderer::RenderMaterial material{};
+    const auto& albedo = viewport_mesh_textures_[i];
+    material.albedo_texture_path = albedo.empty() ? nullptr : albedo.c_str();
+    material.tint[0] = 1.0f;
+    material.tint[1] = 1.0f;
+    material.tint[2] = 1.0f;
+    material.tint[3] = 1.0f;
+    material.use_albedo = !albedo.empty();
+
+    const std::size_t material_index = scene_builder.AddMaterial(material);
+    const auto model_transform = cookie::renderer::MultiplyTransforms(
+        viewport_mesh_transforms_[i], view_projection);
+
+    const auto& primitive = viewport_mesh_cache_[i];
+    if (!primitive.indices.empty()) {
+      scene_builder.AddIndexedMeshInstance(
+          primitive.vertices.data(), primitive.vertices.size(),
+          primitive.indices.data(), primitive.indices.size(), material_index,
+          model_transform);
+    } else {
+      scene_builder.AddMeshInstance(
+          primitive.vertices.data(), primitive.vertices.size(), material_index,
+          model_transform);
+    }
+  }
+
+  viewport_renderer_->SubmitScene(scene_builder.Build());
+  viewport_renderer_->EndFrame();
 }
