@@ -12,6 +12,10 @@
 #include "Cookie/Renderer/MeshAsset.h"
 #include "Cookie/Renderer/RendererBackend.h"
 
+namespace cookie::renderer {
+class SceneBuilder;
+}
+
 class QListWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -55,6 +59,13 @@ class EditorMainWindow final : public QMainWindow {
   void RebuildViewportSceneCache();
   void RenderViewportFrame();
   void UpdateViewportCamera(float delta_time_seconds);
+  void SetSelectedObjectIndexFromViewport(int index);
+  bool TryPickSceneObjectFromViewport(float mouse_x, float mouse_y, int& out_index) const;
+  void RenderSelectedObjectGizmo(cookie::renderer::SceneBuilder& scene_builder,
+                                 const cookie::renderer::Float4x4& view_projection);
+  bool BeginGizmoDrag(float mouse_x, float mouse_y);
+  void UpdateGizmoDrag(float mouse_x, float mouse_y);
+  void EndGizmoDrag();
 
   std::filesystem::path project_root_;
   cookie::assets::AssetRegistry asset_registry_;
@@ -101,6 +112,21 @@ class EditorMainWindow final : public QMainWindow {
   std::vector<std::string> viewport_mesh_textures_;
   std::vector<cookie::renderer::Float4x4> viewport_mesh_transforms_;
   bool inspector_updating_ = false;
+  enum class GizmoMode {
+    kTranslate = 0,
+    kRotate = 1,
+    kScale = 2,
+  };
+  QComboBox* gizmo_mode_selector_ = nullptr;
+  GizmoMode gizmo_mode_ = GizmoMode::kTranslate;
+  int selected_object_index_ = -1;
+  bool gizmo_drag_active_ = false;
+  int gizmo_drag_axis_ = -1;
+  float gizmo_drag_start_mouse_x_ = 0.0f;
+  float gizmo_drag_start_mouse_y_ = 0.0f;
+  float gizmo_drag_start_position_[3] = {0.0f, 0.0f, 0.0f};
+  float gizmo_drag_start_rotation_[3] = {0.0f, 0.0f, 0.0f};
+  float gizmo_drag_start_scale_[3] = {1.0f, 1.0f, 1.0f};
 
   float viewport_camera_position_[3] = {4.0f, 3.0f, -7.0f};
   float viewport_camera_yaw_radians_ = 0.0f;

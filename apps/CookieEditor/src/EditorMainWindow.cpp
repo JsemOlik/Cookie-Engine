@@ -29,6 +29,7 @@
 #include <QWidget>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <chrono>
@@ -44,6 +45,7 @@
 #include "Cookie/Assets/AssetMeta.h"
 #include "Cookie/Assets/MaterialAsset.h"
 #include "Cookie/Assets/SceneAsset.h"
+#include "Cookie/Renderer/Primitives.h"
 #include "Cookie/Core/GameConfig.h"
 #include "Cookie/Renderer/SceneBuilder.h"
 #include "Cookie/Renderer/Transform.h"
@@ -58,6 +60,13 @@ struct EditorVec3 {
   float x = 0.0f;
   float y = 0.0f;
   float z = 0.0f;
+};
+
+struct EditorVec4 {
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float w = 1.0f;
 };
 
 EditorVec3 AddVec3(const EditorVec3& a, const EditorVec3& b) {
@@ -91,6 +100,21 @@ EditorVec3 CrossVec3(const EditorVec3& a, const EditorVec3& b) {
       a.z * b.x - a.x * b.z,
       a.x * b.y - a.y * b.x,
   };
+}
+
+EditorVec4 TransformPoint(const cookie::renderer::Float4x4& matrix,
+                          const EditorVec3& point) {
+  // Row-vector convention to match shader usage: mul(float4(pos,1), M)
+  EditorVec4 out{};
+  out.x = point.x * matrix.m[0] + point.y * matrix.m[4] + point.z * matrix.m[8] +
+          matrix.m[12];
+  out.y = point.x * matrix.m[1] + point.y * matrix.m[5] + point.z * matrix.m[9] +
+          matrix.m[13];
+  out.z = point.x * matrix.m[2] + point.y * matrix.m[6] + point.z * matrix.m[10] +
+          matrix.m[14];
+  out.w = point.x * matrix.m[3] + point.y * matrix.m[7] + point.z * matrix.m[11] +
+          matrix.m[15];
+  return out;
 }
 
 QDockWidget* CreateDock(
@@ -336,7 +360,11 @@ EditorMainWindow::EditorMainWindow(
               const int previous_index = scene_outliner_list_->row(previous);
               ApplyInspectorToObjectIndex(previous_index, false);
             }
-            (void)current;
+            if (current != nullptr) {
+              selected_object_index_ = scene_outliner_list_->row(current);
+            } else {
+              selected_object_index_ = -1;
+            }
             RefreshInspector();
           });
   connect(startup_scene_selector_, &QComboBox::currentTextChanged, this,
@@ -491,6 +519,11 @@ EditorMainWindow::EditorMainWindow(
 
   auto* scene_outliner_panel = new QWidget(this);
   auto* scene_outliner_layout = new QVBoxLayout(scene_outliner_panel);
+  gizmo_mode_selector_ = new QComboBox(scene_outliner_panel);
+  gizmo_mode_selector_->addItem("Translate (W)");
+  gizmo_mode_selector_->addItem("Rotate (E)");
+  gizmo_mode_selector_->addItem("Scale (R)");
+  scene_outliner_layout->addWidget(gizmo_mode_selector_);
   scene_outliner_layout->addWidget(scene_outliner_list_);
   auto* outliner_actions = new QHBoxLayout();
   auto* add_object_button = new QPushButton("Add", scene_outliner_panel);
@@ -501,6 +534,16 @@ EditorMainWindow::EditorMainWindow(
   outliner_actions->addWidget(remove_object_button);
   scene_outliner_layout->addLayout(outliner_actions);
   scene_outliner_layout->addWidget(save_scene_button_);
+  connect(gizmo_mode_selector_, &QComboBox::currentIndexChanged, this,
+          [this](int index) {
+            if (index == 1) {
+              gizmo_mode_ = GizmoMode::kRotate;
+            } else if (index == 2) {
+              gizmo_mode_ = GizmoMode::kScale;
+            } else {
+              gizmo_mode_ = GizmoMode::kTranslate;
+            }
+          });
 
   connect(add_object_button, &QPushButton::clicked, this, [this]() {
     cookie::assets::SceneAssetObject object{};
@@ -775,6 +818,10 @@ void EditorMainWindow::RefreshSceneOutliner() {
     }
     scene_outliner_list_->addItem(label);
   }
+  if (selected_object_index_ >= 0 &&
+      selected_object_index_ < scene_outliner_list_->count()) {
+    scene_outliner_list_->setCurrentRow(selected_object_index_);
+  }
 }
 
 int EditorMainWindow::CurrentSceneObjectIndex() const {
@@ -784,6 +831,7 @@ int EditorMainWindow::CurrentSceneObjectIndex() const {
 void EditorMainWindow::LoadActiveScene() {
   active_scene_ = {};
   active_scene_path_.clear();
+  selected_object_index_ = -1;
   const auto game_config =
       cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
   if (game_config.startup_scene_asset_id.empty()) {
@@ -806,6 +854,9 @@ void EditorMainWindow::LoadActiveScene() {
     return;
   }
   active_scene_path_ = scene_path;
+  if (!active_scene_.objects.empty()) {
+    selected_object_index_ = 0;
+  }
   RebuildViewportSceneCache();
 }
 
@@ -1130,6 +1181,252 @@ void EditorMainWindow::RebuildViewportSceneCache() {
   }
 }
 
+void EditorMainWindow::SetSelectedObjectIndexFromViewport(int index) {
+  if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+    return;
+  }
+  selected_object_index_ = index;
+  scene_outliner_list_->setCurrentRow(index);
+}
+
+bool EditorMainWindow::TryPickSceneObjectFromViewport(
+    float mouse_x, float mouse_y, int& out_index) const {
+  if (viewport_widget_ == nullptr) {
+    return false;
+  }
+  const float width = static_cast<float>(std::max(1, viewport_widget_->width()));
+  const float height = static_cast<float>(std::max(1, viewport_widget_->height()));
+  const float aspect_ratio = width / height;
+  const auto projection = cookie::renderer::MakePerspectiveProjection(
+      1.04719755f, aspect_ratio, 0.01f, 100.0f);
+  const EditorVec3 world_up{0.0f, 1.0f, 0.0f};
+  const EditorVec3 forward = NormalizeVec3({
+      std::cos(viewport_camera_pitch_radians_) * std::sin(viewport_camera_yaw_radians_),
+      std::sin(viewport_camera_pitch_radians_),
+      std::cos(viewport_camera_pitch_radians_) * std::cos(viewport_camera_yaw_radians_),
+  });
+  const EditorVec3 camera_position{
+      viewport_camera_position_[0],
+      viewport_camera_position_[1],
+      viewport_camera_position_[2],
+  };
+  const EditorVec3 camera_target = AddVec3(camera_position, forward);
+  const auto view = cookie::renderer::MakeLookAtView(
+      camera_position.x, camera_position.y, camera_position.z,
+      camera_target.x, camera_target.y, camera_target.z,
+      world_up.x, world_up.y, world_up.z);
+  const auto view_projection = cookie::renderer::MultiplyTransforms(view, projection);
+
+  int best_index = -1;
+  float best_depth = 1e9f;
+  float best_dist2 = 1e9f;
+  constexpr float kPickRadiusPixels = 24.0f;
+  const float pick_radius2 = kPickRadiusPixels * kPickRadiusPixels;
+  for (std::size_t i = 0; i < active_scene_.objects.size(); ++i) {
+    const auto& object = active_scene_.objects[i];
+    if (!object.has_mesh_renderer) {
+      continue;
+    }
+    const EditorVec3 center{
+        object.transform.position[0],
+        object.transform.position[1],
+        object.transform.position[2],
+    };
+    const EditorVec4 clip = TransformPoint(view_projection, center);
+    if (clip.w <= 0.0001f) {
+      continue;
+    }
+    const float inv_w = 1.0f / clip.w;
+    const float ndc_x = clip.x * inv_w;
+    const float ndc_y = clip.y * inv_w;
+    const float ndc_z = clip.z * inv_w;
+    if (ndc_z < 0.0f || ndc_z > 1.2f) {
+      continue;
+    }
+    const float screen_x = (ndc_x * 0.5f + 0.5f) * width;
+    const float screen_y = (1.0f - (ndc_y * 0.5f + 0.5f)) * height;
+    const float dx = screen_x - mouse_x;
+    const float dy = screen_y - mouse_y;
+    const float dist2 = dx * dx + dy * dy;
+    if (dist2 > pick_radius2) {
+      continue;
+    }
+    if (ndc_z < best_depth || (std::abs(ndc_z - best_depth) < 0.0001f && dist2 < best_dist2)) {
+      best_depth = ndc_z;
+      best_dist2 = dist2;
+      best_index = static_cast<int>(i);
+    }
+  }
+  if (best_index < 0) {
+    return false;
+  }
+  out_index = best_index;
+  return true;
+}
+
+void EditorMainWindow::RenderSelectedObjectGizmo(
+    cookie::renderer::SceneBuilder& scene_builder,
+    const cookie::renderer::Float4x4& view_projection) {
+  if (selected_object_index_ < 0 ||
+      static_cast<std::size_t>(selected_object_index_) >= active_scene_.objects.size()) {
+    return;
+  }
+  const auto& object = active_scene_.objects[static_cast<std::size_t>(selected_object_index_)];
+  const auto vertices = cookie::renderer::MakeColoredCubeVertices();
+  const auto indices = cookie::renderer::MakeCubeIndices();
+
+  const float axis_len = 0.6f;
+  const float axis_thickness = 0.06f;
+  const EditorVec3 origin{
+      object.transform.position[0],
+      object.transform.position[1],
+      object.transform.position[2],
+  };
+  const std::array<EditorVec3, 3> offsets = {
+      EditorVec3{axis_len * 0.5f, 0.0f, 0.0f},
+      EditorVec3{0.0f, axis_len * 0.5f, 0.0f},
+      EditorVec3{0.0f, 0.0f, axis_len * 0.5f},
+  };
+  const std::array<cookie::renderer::Float4x4, 3> scales = {
+      cookie::renderer::MakeScaleTransform(axis_len, axis_thickness, axis_thickness),
+      cookie::renderer::MakeScaleTransform(axis_thickness, axis_len, axis_thickness),
+      cookie::renderer::MakeScaleTransform(axis_thickness, axis_thickness, axis_len),
+  };
+  const std::array<std::array<float, 4>, 3> colors = {{
+      {1.0f, 0.2f, 0.2f, 1.0f},
+      {0.2f, 1.0f, 0.2f, 1.0f},
+      {0.2f, 0.5f, 1.0f, 1.0f},
+  }};
+
+  for (int axis = 0; axis < 3; ++axis) {
+    cookie::renderer::RenderMaterial material{};
+    material.use_albedo = false;
+    material.tint[0] = colors[axis][0];
+    material.tint[1] = colors[axis][1];
+    material.tint[2] = colors[axis][2];
+    material.tint[3] = colors[axis][3];
+    const std::size_t material_index = scene_builder.AddMaterial(material);
+    const auto translation = cookie::renderer::MakeTranslationTransform(
+        origin.x + offsets[axis].x, origin.y + offsets[axis].y, origin.z + offsets[axis].z);
+    const auto model = cookie::renderer::MultiplyTransforms(
+        scales[axis], cookie::renderer::MultiplyTransforms(translation, view_projection));
+    scene_builder.AddIndexedMeshInstance(
+        vertices.data(), vertices.size(), indices.data(), indices.size(),
+        material_index, model);
+  }
+}
+
+bool EditorMainWindow::BeginGizmoDrag(float mouse_x, float mouse_y) {
+  if (selected_object_index_ < 0 ||
+      static_cast<std::size_t>(selected_object_index_) >= active_scene_.objects.size()) {
+    return false;
+  }
+  const auto& object = active_scene_.objects[static_cast<std::size_t>(selected_object_index_)];
+  const float width = static_cast<float>(std::max(1, viewport_widget_->width()));
+  const float height = static_cast<float>(std::max(1, viewport_widget_->height()));
+  const float aspect_ratio = width / height;
+  const auto projection = cookie::renderer::MakePerspectiveProjection(
+      1.04719755f, aspect_ratio, 0.01f, 100.0f);
+  const EditorVec3 world_up{0.0f, 1.0f, 0.0f};
+  const EditorVec3 forward = NormalizeVec3({
+      std::cos(viewport_camera_pitch_radians_) * std::sin(viewport_camera_yaw_radians_),
+      std::sin(viewport_camera_pitch_radians_),
+      std::cos(viewport_camera_pitch_radians_) * std::cos(viewport_camera_yaw_radians_),
+  });
+  const EditorVec3 camera_position{
+      viewport_camera_position_[0], viewport_camera_position_[1], viewport_camera_position_[2]};
+  const EditorVec3 camera_target = AddVec3(camera_position, forward);
+  const auto view = cookie::renderer::MakeLookAtView(
+      camera_position.x, camera_position.y, camera_position.z,
+      camera_target.x, camera_target.y, camera_target.z, 0.0f, 1.0f, 0.0f);
+  const auto vp = cookie::renderer::MultiplyTransforms(view, projection);
+
+  const EditorVec3 origin{
+      object.transform.position[0], object.transform.position[1], object.transform.position[2]};
+  const std::array<EditorVec3, 3> axis_targets = {
+      AddVec3(origin, {0.6f, 0.0f, 0.0f}),
+      AddVec3(origin, {0.0f, 0.6f, 0.0f}),
+      AddVec3(origin, {0.0f, 0.0f, 0.6f}),
+  };
+  const EditorVec4 origin_clip = TransformPoint(vp, origin);
+  if (origin_clip.w <= 0.0001f) {
+    return false;
+  }
+  const float origin_x = (origin_clip.x / origin_clip.w * 0.5f + 0.5f) * width;
+  const float origin_y = (1.0f - (origin_clip.y / origin_clip.w * 0.5f + 0.5f)) * height;
+
+  int best_axis = -1;
+  float best = 1e9f;
+  for (int axis = 0; axis < 3; ++axis) {
+    const EditorVec4 tip_clip = TransformPoint(vp, axis_targets[axis]);
+    if (tip_clip.w <= 0.0001f) {
+      continue;
+    }
+    const float tip_x = (tip_clip.x / tip_clip.w * 0.5f + 0.5f) * width;
+    const float tip_y = (1.0f - (tip_clip.y / tip_clip.w * 0.5f + 0.5f)) * height;
+    const float seg_x = tip_x - origin_x;
+    const float seg_y = tip_y - origin_y;
+    const float seg_len2 = seg_x * seg_x + seg_y * seg_y;
+    if (seg_len2 < 1.0f) {
+      continue;
+    }
+    const float px = mouse_x - origin_x;
+    const float py = mouse_y - origin_y;
+    const float t = std::clamp((px * seg_x + py * seg_y) / seg_len2, 0.0f, 1.0f);
+    const float proj_x = origin_x + seg_x * t;
+    const float proj_y = origin_y + seg_y * t;
+    const float dx = mouse_x - proj_x;
+    const float dy = mouse_y - proj_y;
+    const float dist2 = dx * dx + dy * dy;
+    if (dist2 < best) {
+      best = dist2;
+      best_axis = axis;
+    }
+  }
+  if (best_axis < 0 || best > (18.0f * 18.0f)) {
+    return false;
+  }
+
+  gizmo_drag_active_ = true;
+  gizmo_drag_axis_ = best_axis;
+  gizmo_drag_start_mouse_x_ = mouse_x;
+  gizmo_drag_start_mouse_y_ = mouse_y;
+  for (int i = 0; i < 3; ++i) {
+    gizmo_drag_start_position_[i] = object.transform.position[i];
+    gizmo_drag_start_rotation_[i] = object.transform.rotation_euler_degrees[i];
+    gizmo_drag_start_scale_[i] = object.transform.scale[i];
+  }
+  return true;
+}
+
+void EditorMainWindow::UpdateGizmoDrag(float mouse_x, float mouse_y) {
+  if (!gizmo_drag_active_ || selected_object_index_ < 0 ||
+      static_cast<std::size_t>(selected_object_index_) >= active_scene_.objects.size()) {
+    return;
+  }
+  auto& object = active_scene_.objects[static_cast<std::size_t>(selected_object_index_)];
+  const float delta_x = mouse_x - gizmo_drag_start_mouse_x_;
+  const float delta_y = mouse_y - gizmo_drag_start_mouse_y_;
+  const float delta = delta_x - delta_y;
+  const int axis = std::clamp(gizmo_drag_axis_, 0, 2);
+  if (gizmo_mode_ == GizmoMode::kTranslate) {
+    object.transform.position[axis] = gizmo_drag_start_position_[axis] + delta * 0.01f;
+  } else if (gizmo_mode_ == GizmoMode::kRotate) {
+    object.transform.rotation_euler_degrees[axis] =
+        gizmo_drag_start_rotation_[axis] + delta * 0.3f;
+  } else {
+    object.transform.scale[axis] =
+        std::max(0.01f, gizmo_drag_start_scale_[axis] + delta * 0.005f);
+  }
+  RefreshInspector();
+  RebuildViewportSceneCache();
+}
+
+void EditorMainWindow::EndGizmoDrag() {
+  gizmo_drag_active_ = false;
+  gizmo_drag_axis_ = -1;
+}
+
 void EditorMainWindow::RenderViewportFrame() {
   EnsureViewportRendererInitialized();
   if (!viewport_renderer_initialized_ || !viewport_renderer_) {
@@ -1203,6 +1500,8 @@ void EditorMainWindow::RenderViewportFrame() {
     }
   }
 
+  RenderSelectedObjectGizmo(scene_builder, view_projection);
+
   viewport_renderer_->SubmitScene(scene_builder.Build());
   viewport_renderer_->EndFrame();
 }
@@ -1238,6 +1537,17 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
               viewport_widget_->width() / 2, viewport_widget_->height() / 2);
           QCursor::setPos(viewport_widget_->mapToGlobal(local_center));
         }
+      } else if (mouse_event->button() == Qt::LeftButton &&
+                 !viewport_mouse_look_active_ &&
+                 (viewport_is_hovered_ || viewport_widget_->hasFocus())) {
+        const float mouse_x = static_cast<float>(mouse_event->position().x());
+        const float mouse_y = static_cast<float>(mouse_event->position().y());
+        if (!BeginGizmoDrag(mouse_x, mouse_y)) {
+          int picked_index = -1;
+          if (TryPickSceneObjectFromViewport(mouse_x, mouse_y, picked_index)) {
+            SetSelectedObjectIndexFromViewport(picked_index);
+          }
+        }
       }
       break;
     }
@@ -1249,6 +1559,8 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
           viewport_widget_->unsetCursor();
           viewport_cursor_captured_ = false;
         }
+      } else if (mouse_event->button() == Qt::LeftButton) {
+        EndGizmoDrag();
       }
       break;
     }
@@ -1263,6 +1575,10 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
         viewport_pending_mouse_delta_y_ +=
             static_cast<float>(current_local.y() - local_center.y());
         QCursor::setPos(viewport_widget_->mapToGlobal(local_center));
+      } else if (gizmo_drag_active_) {
+        UpdateGizmoDrag(
+            static_cast<float>(mouse_event->position().x()),
+            static_cast<float>(mouse_event->position().y()));
       }
       break;
     }
@@ -1279,11 +1595,30 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
       viewport_key_q_down_ = false;
       viewport_key_e_down_ = false;
       viewport_key_shift_down_ = false;
+      EndGizmoDrag();
       break;
     case QEvent::KeyPress:
     case QEvent::KeyRelease: {
       const auto* key_event = static_cast<QKeyEvent*>(event);
       const bool is_down = (event->type() == QEvent::KeyPress);
+      if (is_down && !viewport_mouse_look_active_) {
+        if (key_event->key() == Qt::Key_W) {
+          gizmo_mode_ = GizmoMode::kTranslate;
+          if (gizmo_mode_selector_ != nullptr) {
+            gizmo_mode_selector_->setCurrentIndex(0);
+          }
+        } else if (key_event->key() == Qt::Key_E) {
+          gizmo_mode_ = GizmoMode::kRotate;
+          if (gizmo_mode_selector_ != nullptr) {
+            gizmo_mode_selector_->setCurrentIndex(1);
+          }
+        } else if (key_event->key() == Qt::Key_R) {
+          gizmo_mode_ = GizmoMode::kScale;
+          if (gizmo_mode_selector_ != nullptr) {
+            gizmo_mode_selector_->setCurrentIndex(2);
+          }
+        }
+      }
       switch (key_event->key()) {
         case Qt::Key_W:
           viewport_key_w_down_ = is_down;
