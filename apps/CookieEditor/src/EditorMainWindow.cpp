@@ -34,6 +34,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -669,7 +670,8 @@ void EditorMainWindow::RebuildAssetBrowserTree() {
   assets_tree_->clear();
 
   QMap<QString, QTreeWidgetItem*> folder_nodes;
-  auto ensure_folder_path = [&](const QString& folder_path) -> QTreeWidgetItem* {
+  std::function<QTreeWidgetItem*(const QString&)> ensure_folder_path =
+      [&](const QString& folder_path) -> QTreeWidgetItem* {
     if (folder_path.isEmpty()) {
       return nullptr;
     }
