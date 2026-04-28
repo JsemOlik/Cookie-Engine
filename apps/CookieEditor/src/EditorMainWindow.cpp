@@ -1,13 +1,17 @@
 #include "Cookie/Editor/EditorMainWindow.h"
 
 #include <QComboBox>
+#include <QCheckBox>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QFormLayout>
+#include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QString>
@@ -18,6 +22,8 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <system_error>
 
 #include "Cookie/Assets/AssetMeta.h"
 #include "Cookie/Assets/SceneAsset.h"
@@ -116,6 +122,17 @@ std::filesystem::path DetectDefaultRuntimeBuildDir(
   return candidates.front();
 }
 
+bool TryParseFloat(const QString& text, float& out_value) {
+  const std::string raw = text.trimmed().toStdString();
+  if (raw.empty()) {
+    return false;
+  }
+  const char* begin = raw.data();
+  const char* end = raw.data() + raw.size();
+  auto parsed = std::from_chars(begin, end, out_value);
+  return parsed.ec == std::errc() && parsed.ptr == end;
+}
+
 std::filesystem::path ResolveEditorProjectRoot(
     const std::filesystem::path& project_root_override) {
   if (!project_root_override.empty()) {
@@ -176,9 +193,25 @@ EditorMainWindow::EditorMainWindow(
   meta_inspector_ = new QTextEdit(this);
   meta_inspector_->setReadOnly(true);
   startup_scene_selector_ = new QComboBox(this);
+  object_name_input_ = new QLineEdit(this);
+  pos_x_input_ = new QLineEdit(this);
+  pos_y_input_ = new QLineEdit(this);
+  pos_z_input_ = new QLineEdit(this);
+  scale_x_input_ = new QLineEdit(this);
+  scale_y_input_ = new QLineEdit(this);
+  scale_z_input_ = new QLineEdit(this);
+  mesh_asset_id_input_ = new QLineEdit(this);
+  material_asset_id_input_ = new QLineEdit(this);
+  rigidbody_enabled_input_ = new QCheckBox(this);
+  rigidbody_type_input_ = new QLineEdit(this);
+  rigidbody_mass_input_ = new QLineEdit(this);
+  apply_object_button_ = new QPushButton("Apply Object", this);
+  save_scene_button_ = new QPushButton("Save Scene", this);
 
   connect(assets_list_, &QListWidget::currentRowChanged, this,
           [this](const int index) { UpdateMetaInspector(index); });
+  connect(scene_outliner_list_, &QListWidget::currentRowChanged, this,
+          [this](const int) { RefreshInspector(); });
   connect(startup_scene_selector_, &QComboBox::currentTextChanged, this,
           [this](const QString& text) {
             const QString selected_asset_id = text.section(' ', 0, 0);
@@ -191,8 +224,13 @@ EditorMainWindow::EditorMainWindow(
             cookie::core::SaveGameConfig(
                 project_root_ / "config" / "game.json", game_config);
             statusBar()->showMessage("Updated startup scene AssetId in config/game.json");
+            LoadActiveScene();
             RefreshSceneOutliner();
           });
+  connect(apply_object_button_, &QPushButton::clicked, this,
+          [this]() { ApplyInspectorToSelectedObject(); });
+  connect(save_scene_button_, &QPushButton::clicked, this,
+          [this]() { SaveActiveScene(); });
 
   auto* build_panel = new QWidget(this);
   auto* build_layout = new QVBoxLayout(build_panel);
@@ -300,18 +338,92 @@ EditorMainWindow::EditorMainWindow(
                                             : "Export finished with failures");
   });
 
+  auto* scene_outliner_panel = new QWidget(this);
+  auto* scene_outliner_layout = new QVBoxLayout(scene_outliner_panel);
+  scene_outliner_layout->addWidget(scene_outliner_list_);
+  auto* outliner_actions = new QHBoxLayout();
+  auto* add_object_button = new QPushButton("Add", scene_outliner_panel);
+  auto* rename_object_button = new QPushButton("Rename", scene_outliner_panel);
+  auto* remove_object_button = new QPushButton("Remove", scene_outliner_panel);
+  outliner_actions->addWidget(add_object_button);
+  outliner_actions->addWidget(rename_object_button);
+  outliner_actions->addWidget(remove_object_button);
+  scene_outliner_layout->addLayout(outliner_actions);
+  scene_outliner_layout->addWidget(save_scene_button_);
+
+  connect(add_object_button, &QPushButton::clicked, this, [this]() {
+    cookie::assets::SceneAssetObject object{};
+    object.name = "NewObject_" + std::to_string(active_scene_.objects.size() + 1);
+    active_scene_.objects.push_back(object);
+    RefreshSceneOutliner();
+    scene_outliner_list_->setCurrentRow(
+        static_cast<int>(active_scene_.objects.size() - 1));
+    statusBar()->showMessage("Added scene object.");
+  });
+  connect(rename_object_button, &QPushButton::clicked, this, [this]() {
+    const int index = CurrentSceneObjectIndex();
+    if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+      return;
+    }
+    const QString current =
+        QString::fromStdString(active_scene_.objects[static_cast<std::size_t>(index)].name);
+    bool accepted = false;
+    const QString renamed = QInputDialog::getText(
+        this, "Rename Object", "Object Name:", QLineEdit::Normal, current,
+        &accepted);
+    if (!accepted || renamed.trimmed().isEmpty()) {
+      return;
+    }
+    active_scene_.objects[static_cast<std::size_t>(index)].name =
+        renamed.trimmed().toStdString();
+    RefreshSceneOutliner();
+    scene_outliner_list_->setCurrentRow(index);
+    statusBar()->showMessage("Renamed scene object.");
+  });
+  connect(remove_object_button, &QPushButton::clicked, this, [this]() {
+    const int index = CurrentSceneObjectIndex();
+    if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+      return;
+    }
+    active_scene_.objects.erase(active_scene_.objects.begin() + index);
+    RefreshSceneOutliner();
+    const int next = std::min(index, static_cast<int>(active_scene_.objects.size()) - 1);
+    if (next >= 0) {
+      scene_outliner_list_->setCurrentRow(next);
+    }
+    statusBar()->showMessage("Removed scene object.");
+  });
+
+  auto* inspector_panel = new QWidget(this);
+  auto* inspector_layout = new QFormLayout(inspector_panel);
+  inspector_layout->addRow("Name", object_name_input_);
+  inspector_layout->addRow("Position X", pos_x_input_);
+  inspector_layout->addRow("Position Y", pos_y_input_);
+  inspector_layout->addRow("Position Z", pos_z_input_);
+  inspector_layout->addRow("Scale X", scale_x_input_);
+  inspector_layout->addRow("Scale Y", scale_y_input_);
+  inspector_layout->addRow("Scale Z", scale_z_input_);
+  inspector_layout->addRow("Mesh AssetId", mesh_asset_id_input_);
+  inspector_layout->addRow("Material AssetId", material_asset_id_input_);
+  inspector_layout->addRow("RigidBody Enabled", rigidbody_enabled_input_);
+  inspector_layout->addRow("RigidBody Type", rigidbody_type_input_);
+  inspector_layout->addRow("RigidBody Mass", rigidbody_mass_input_);
+  inspector_layout->addRow(apply_object_button_);
+
   addDockWidget(Qt::LeftDockWidgetArea,
                 CreateDock(
                     "Hierarchy",
                     CreatePlaceholderPanel("Hierarchy Placeholder", this), this));
   addDockWidget(Qt::RightDockWidgetArea,
                 CreateDock("Meta Inspector", meta_inspector_, this));
+  addDockWidget(Qt::RightDockWidgetArea,
+                CreateDock("Object Inspector", inspector_panel, this));
   addDockWidget(Qt::BottomDockWidgetArea,
                 CreateDock("Assets", assets_list_, this));
   addDockWidget(Qt::BottomDockWidgetArea,
                 CreateDock("Build/Export", build_panel, this));
   addDockWidget(Qt::LeftDockWidgetArea,
-                CreateDock("Scene Outliner", scene_outliner_list_, this));
+                CreateDock("Scene Outliner", scene_outliner_panel, this));
   addDockWidget(Qt::RightDockWidgetArea,
                 CreateDock(
                     "Game Viewport",
@@ -324,7 +436,9 @@ EditorMainWindow::EditorMainWindow(
   asset_registry_.LoadCookedRegistry(cooked_registry_path);
   RefreshAssets();
   RefreshStartupSceneSelector();
+  LoadActiveScene();
   RefreshSceneOutliner();
+  RefreshInspector();
   statusBar()->showMessage(
       "Cookie Editor Phase 24B shell loaded (project root: " +
       QString::fromStdString(project_root_.string()) + ")");
@@ -351,7 +465,9 @@ void EditorMainWindow::RefreshAssets() {
   }
 
   RefreshStartupSceneSelector();
+  LoadActiveScene();
   RefreshSceneOutliner();
+  RefreshInspector();
 }
 
 void EditorMainWindow::UpdateMetaInspector(const int index) {
@@ -391,38 +507,125 @@ void EditorMainWindow::RefreshStartupSceneSelector() {
 
 void EditorMainWindow::RefreshSceneOutliner() {
   scene_outliner_list_->clear();
-  const auto game_config = cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
-  if (game_config.startup_scene_asset_id.empty()) {
+  if (active_scene_path_.empty()) {
     scene_outliner_list_->addItem("No startup scene AssetId configured.");
     return;
   }
 
-  const auto scene_path =
-      asset_registry_.ResolveAssetPath(game_config.startup_scene_asset_id);
+  for (const auto& object : active_scene_.objects) {
+    scene_outliner_list_->addItem(QString::fromStdString(object.name));
+  }
+}
+
+int EditorMainWindow::CurrentSceneObjectIndex() const {
+  return scene_outliner_list_->currentRow();
+}
+
+void EditorMainWindow::LoadActiveScene() {
+  active_scene_ = {};
+  active_scene_path_.clear();
+  const auto game_config =
+      cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
+  if (game_config.startup_scene_asset_id.empty()) {
+    return;
+  }
+
+  const auto scene_path = asset_registry_.ResolveAssetPath(
+      game_config.startup_scene_asset_id);
   if (scene_path.empty()) {
-    scene_outliner_list_->addItem(
+    statusBar()->showMessage(
         "Startup scene not resolved: " +
         QString::fromStdString(game_config.startup_scene_asset_id));
     return;
   }
 
-  cookie::assets::SceneAsset scene_asset;
   std::string scene_error;
-  if (!cookie::assets::LoadSceneAsset(scene_path, scene_asset, &scene_error)) {
-    scene_outliner_list_->addItem(
-        "Failed to load scene: " + QString::fromStdString(scene_error));
+  if (!cookie::assets::LoadSceneAsset(scene_path, active_scene_, &scene_error)) {
+    statusBar()->showMessage(
+        "Failed to load startup scene: " + QString::fromStdString(scene_error));
     return;
   }
+  active_scene_path_ = scene_path;
+}
 
-  scene_outliner_list_->addItem(
-      "Scene AssetId: " + QString::fromStdString(game_config.startup_scene_asset_id));
-  for (const auto& nested_id : scene_asset.nested_scene_asset_ids) {
-    scene_outliner_list_->addItem("Nested Scene: " + QString::fromStdString(nested_id));
+void EditorMainWindow::RefreshInspector() {
+  const int index = CurrentSceneObjectIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+    object_name_input_->setText("");
+    pos_x_input_->setText("");
+    pos_y_input_->setText("");
+    pos_z_input_->setText("");
+    scale_x_input_->setText("");
+    scale_y_input_->setText("");
+    scale_z_input_->setText("");
+    mesh_asset_id_input_->setText("");
+    material_asset_id_input_->setText("");
+    rigidbody_enabled_input_->setChecked(false);
+    rigidbody_type_input_->setText("");
+    rigidbody_mass_input_->setText("");
+    return;
   }
-  for (const auto& object : scene_asset.objects) {
-    scene_outliner_list_->addItem("Object: " + QString::fromStdString(object.name));
-    scene_outliner_list_->addItem("  Mesh: " + QString::fromStdString(object.mesh_asset_id));
-    scene_outliner_list_->addItem(
-        "  Material: " + QString::fromStdString(object.material_asset_id));
+  const auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
+  object_name_input_->setText(QString::fromStdString(object.name));
+  pos_x_input_->setText(QString::number(object.transform.position[0]));
+  pos_y_input_->setText(QString::number(object.transform.position[1]));
+  pos_z_input_->setText(QString::number(object.transform.position[2]));
+  scale_x_input_->setText(QString::number(object.transform.scale[0]));
+  scale_y_input_->setText(QString::number(object.transform.scale[1]));
+  scale_z_input_->setText(QString::number(object.transform.scale[2]));
+  mesh_asset_id_input_->setText(
+      QString::fromStdString(object.mesh_renderer.mesh_asset_id));
+  material_asset_id_input_->setText(
+      QString::fromStdString(object.mesh_renderer.material_asset_id));
+  rigidbody_enabled_input_->setChecked(object.has_rigidbody && object.rigidbody.enabled);
+  rigidbody_type_input_->setText(QString::fromStdString(object.rigidbody.body_type));
+  rigidbody_mass_input_->setText(QString::number(object.rigidbody.mass));
+}
+
+void EditorMainWindow::ApplyInspectorToSelectedObject() {
+  const int index = CurrentSceneObjectIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
+    return;
   }
+  auto& object = active_scene_.objects[static_cast<std::size_t>(index)];
+  object.name = object_name_input_->text().trimmed().toStdString();
+  if (object.name.empty()) {
+    object.name = "Object_" + std::to_string(index + 1);
+  }
+
+  TryParseFloat(pos_x_input_->text(), object.transform.position[0]);
+  TryParseFloat(pos_y_input_->text(), object.transform.position[1]);
+  TryParseFloat(pos_z_input_->text(), object.transform.position[2]);
+  TryParseFloat(scale_x_input_->text(), object.transform.scale[0]);
+  TryParseFloat(scale_y_input_->text(), object.transform.scale[1]);
+  TryParseFloat(scale_z_input_->text(), object.transform.scale[2]);
+
+  object.mesh_renderer.mesh_asset_id =
+      mesh_asset_id_input_->text().trimmed().toStdString();
+  object.mesh_renderer.material_asset_id =
+      material_asset_id_input_->text().trimmed().toStdString();
+  object.has_rigidbody = rigidbody_enabled_input_->isChecked();
+  object.rigidbody.enabled = rigidbody_enabled_input_->isChecked();
+  object.rigidbody.body_type = rigidbody_type_input_->text().trimmed().toStdString();
+  TryParseFloat(rigidbody_mass_input_->text(), object.rigidbody.mass);
+
+  RefreshSceneOutliner();
+  scene_outliner_list_->setCurrentRow(index);
+  statusBar()->showMessage("Applied object edits.");
+}
+
+void EditorMainWindow::SaveActiveScene() {
+  if (active_scene_path_.empty()) {
+    QMessageBox::warning(this, "Save Scene", "No active startup scene loaded.");
+    return;
+  }
+  std::string save_error;
+  if (!cookie::assets::SaveSceneAsset(active_scene_path_, active_scene_, &save_error)) {
+    QMessageBox::critical(
+        this, "Save Scene",
+        QString("Failed to save scene:\n") + QString::fromStdString(save_error));
+    return;
+  }
+  statusBar()->showMessage(
+      "Saved scene: " + QString::fromStdString(active_scene_path_.string()));
 }

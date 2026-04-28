@@ -29,6 +29,16 @@ void AddError(ExportResult& result, const std::string& message) {
   AddWarning(result, message);
 }
 
+bool IsTypeOneOf(const std::string& type,
+                 std::initializer_list<std::string_view> allowed) {
+  for (const auto allowed_type : allowed) {
+    if (type == allowed_type) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool CopyFileIfExists(
     const fs::path& source, const fs::path& destination, ExportResult& result) {
   if (!fs::exists(source)) {
@@ -294,19 +304,7 @@ bool BuildCookedRegistryArtifact(
       if (meta.type == "Scene" || meta.type == "SceneAsset") {
         cookie::assets::SceneAsset scene_asset;
         if (cookie::assets::LoadSceneAsset(source_path, scene_asset, nullptr)) {
-          for (const auto& nested : scene_asset.nested_scene_asset_ids) {
-            if (!nested.empty()) {
-              record.dependencies.push_back(nested);
-            }
-          }
-          for (const auto& object : scene_asset.objects) {
-            if (!object.mesh_asset_id.empty()) {
-              record.dependencies.push_back(object.mesh_asset_id);
-            }
-            if (!object.material_asset_id.empty()) {
-              record.dependencies.push_back(object.material_asset_id);
-            }
-          }
+          record.dependencies = cookie::assets::ExtractSceneDependencies(scene_asset);
         }
       } else if (meta.type == "Material" || meta.type == "MaterialAsset") {
         cookie::assets::MaterialAsset material_asset;
@@ -384,6 +382,66 @@ bool BuildCookedRegistryArtifact(
             result,
             "Missing dependency asset in cooked registry: " + record.asset_id +
                 " -> " + dependency);
+      }
+    }
+  }
+
+  std::map<std::string, cookie::assets::CookedAssetRecord> records_by_id;
+  for (const auto& record : registry.Entries()) {
+    records_by_id.insert({record.asset_id, record});
+  }
+  for (const auto& record : registry.Entries()) {
+    if (!IsTypeOneOf(record.type, {"Scene", "SceneAsset"})) {
+      continue;
+    }
+    const auto source_path = project_root / record.source_relative_path;
+    cookie::assets::SceneAsset scene_asset;
+    if (!cookie::assets::LoadSceneAsset(source_path, scene_asset, nullptr)) {
+      continue;
+    }
+    for (const auto& nested_scene_id : scene_asset.nested_scene_asset_ids) {
+      if (nested_scene_id.empty()) {
+        continue;
+      }
+      const auto it = records_by_id.find(nested_scene_id);
+      if (it == records_by_id.end()) {
+        AddError(result, "Scene reference missing: " + record.asset_id + " -> " +
+                             nested_scene_id);
+        continue;
+      }
+      if (!IsTypeOneOf(it->second.type, {"Scene", "SceneAsset"})) {
+        AddError(result, "Scene reference type mismatch: " + record.asset_id +
+                             " nested_scene " + nested_scene_id + " type=" +
+                             it->second.type);
+      }
+    }
+    for (const auto& object : scene_asset.objects) {
+      if (!object.mesh_renderer.mesh_asset_id.empty()) {
+        const auto it = records_by_id.find(object.mesh_renderer.mesh_asset_id);
+        if (it == records_by_id.end()) {
+          AddError(result, "Scene mesh reference missing: " + record.asset_id +
+                               " object=" + object.name + " mesh=" +
+                               object.mesh_renderer.mesh_asset_id);
+        } else if (!IsTypeOneOf(it->second.type, {"Mesh", "Model"})) {
+          AddError(result, "Scene mesh reference type mismatch: " + record.asset_id +
+                               " object=" + object.name + " mesh=" +
+                               object.mesh_renderer.mesh_asset_id + " type=" +
+                               it->second.type);
+        }
+      }
+      if (!object.mesh_renderer.material_asset_id.empty()) {
+        const auto it = records_by_id.find(object.mesh_renderer.material_asset_id);
+        if (it == records_by_id.end()) {
+          AddError(result, "Scene material reference missing: " + record.asset_id +
+                               " object=" + object.name + " material=" +
+                               object.mesh_renderer.material_asset_id);
+        } else if (!IsTypeOneOf(it->second.type, {"Material", "MaterialAsset"})) {
+          AddError(result,
+                   "Scene material reference type mismatch: " + record.asset_id +
+                       " object=" + object.name + " material=" +
+                       object.mesh_renderer.material_asset_id + " type=" +
+                       it->second.type);
+        }
       }
     }
   }

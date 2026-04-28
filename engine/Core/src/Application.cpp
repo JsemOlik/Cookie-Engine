@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
+#include <initializer_list>
 #include <set>
 #include <string>
 #include <utility>
@@ -73,11 +74,43 @@ std::filesystem::path ResolveAssetPathFromId(
   return assets.ResolveAssetPath(asset_id);
 }
 
+bool IsTypeOneOf(const std::string& type,
+                 std::initializer_list<std::string_view> allowed) {
+  for (const auto allowed_type : allowed) {
+    if (type == allowed_type) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ValidateAssetType(
+    const cookie::assets::AssetRegistry& assets, std::string_view asset_id,
+    std::initializer_list<std::string_view> expected_types, Logger& logger,
+    const std::string& context) {
+  if (asset_id.empty()) {
+    logger.Error("Missing AssetId for " + context + ".");
+    return false;
+  }
+  const auto record = assets.ResolveCookedRecord(asset_id);
+  if (!record.has_value()) {
+    logger.Error("Missing cooked asset for " + context + " AssetId '" +
+                 std::string(asset_id) + "'.");
+    return false;
+  }
+  if (!IsTypeOneOf(record->type, expected_types)) {
+    logger.Error("Asset type mismatch for " + context + " AssetId '" +
+                 std::string(asset_id) + "': got '" + record->type + "'.");
+    return false;
+  }
+  return true;
+}
+
 void AddSceneAndNestedSceneObjects(
     const cookie::assets::AssetRegistry& assets, const StartupPaths& paths,
     std::string_view root_scene_asset_id,
     std::vector<cookie::assets::SceneAssetObject>& out_objects,
-    Logger& logger) {
+    Logger& logger, bool& out_had_errors) {
   std::deque<std::string> pending_scene_ids;
   std::set<std::string> visited_scene_ids;
   pending_scene_ids.push_back(std::string(root_scene_asset_id));
@@ -90,10 +123,17 @@ void AddSceneAndNestedSceneObjects(
       continue;
     }
     visited_scene_ids.insert(scene_asset_id);
+    if (!ValidateAssetType(
+            assets, scene_asset_id, {"Scene", "SceneAsset"}, logger,
+            "scene")) {
+      out_had_errors = true;
+      continue;
+    }
 
     const auto scene_path = ResolveAssetPathFromId(assets, paths, scene_asset_id);
     if (scene_path.empty()) {
       logger.Error("Failed to resolve scene asset id: " + scene_asset_id);
+      out_had_errors = true;
       continue;
     }
 
@@ -101,6 +141,7 @@ void AddSceneAndNestedSceneObjects(
     std::string scene_error;
     if (!cookie::assets::LoadSceneAsset(scene_path, scene_asset, &scene_error)) {
       logger.Error(scene_error);
+      out_had_errors = true;
       continue;
     }
 
@@ -110,6 +151,12 @@ void AddSceneAndNestedSceneObjects(
     out_objects.insert(
         out_objects.end(), scene_asset.objects.begin(), scene_asset.objects.end());
     for (const std::string& nested_scene_id : scene_asset.nested_scene_asset_ids) {
+      if (!nested_scene_id.empty() &&
+          !ValidateAssetType(
+              assets, nested_scene_id, {"Scene", "SceneAsset"}, logger,
+              "nested_scene")) {
+        out_had_errors = true;
+      }
       pending_scene_ids.push_back(nested_scene_id);
     }
   }
@@ -350,23 +397,50 @@ int Application::Run() const {
       resolved_demo_albedo_texture_path.string();
   cookie::renderer::SceneBuilder scene_builder;
   std::vector<cookie::assets::SceneAssetObject> startup_scene_objects;
+  bool startup_scene_errors = false;
   AddSceneAndNestedSceneObjects(
-      assets, paths, config_.startup_scene_asset_id, startup_scene_objects, logger);
+      assets, paths, config_.startup_scene_asset_id, startup_scene_objects, logger,
+      startup_scene_errors);
   logger.Info("Startup scene resolved total objects: " +
               std::to_string(startup_scene_objects.size()));
+  if (!config_.startup_scene_asset_id.empty() && startup_scene_objects.empty()) {
+    logger.Error("Startup scene resolved zero objects; startup scene is authoritative.");
+    return 13;
+  }
+  if (startup_scene_errors) {
+    logger.Error("Startup scene validation failed.");
+    return 14;
+  }
 
   struct LoadedScenePrimitive {
     std::vector<cookie::renderer::SceneVertex> vertices;
     std::vector<std::uint32_t> indices;
     std::string albedo_texture_path;
+    cookie::renderer::Float4x4 object_transform =
+        cookie::renderer::MakeIdentityTransform();
   };
   std::vector<LoadedScenePrimitive> loaded_scene_primitives;
   for (const auto& object : startup_scene_objects) {
-    const auto mesh_path = ResolveAssetPathFromId(assets, paths, object.mesh_asset_id);
+    if (!ValidateAssetType(
+            assets, object.mesh_renderer.mesh_asset_id, {"Mesh", "Model"}, logger,
+            "scene mesh")) {
+      startup_scene_errors = true;
+      continue;
+    }
+    if (!ValidateAssetType(
+            assets, object.mesh_renderer.material_asset_id,
+            {"Material", "MaterialAsset"}, logger, "scene material")) {
+      startup_scene_errors = true;
+      continue;
+    }
+
+    const auto mesh_path = ResolveAssetPathFromId(
+        assets, paths, object.mesh_renderer.mesh_asset_id);
     if (mesh_path.empty()) {
       logger.Error("Scene object '" + object.name +
                    "' failed mesh resolve for asset id: " +
-                   object.mesh_asset_id);
+                   object.mesh_renderer.mesh_asset_id);
+      startup_scene_errors = true;
       continue;
     }
 
@@ -376,12 +450,14 @@ int Application::Run() const {
             mesh_path, imported_mesh, &imported_mesh_error)) {
       logger.Error("Scene object '" + object.name + "' failed mesh load: " +
                    imported_mesh_error);
+      startup_scene_errors = true;
       continue;
     }
 
     std::string resolved_albedo_texture = resolved_demo_albedo_texture;
     const auto material_path =
-        ResolveAssetPathFromId(assets, paths, object.material_asset_id);
+        ResolveAssetPathFromId(
+            assets, paths, object.mesh_renderer.material_asset_id);
     if (!material_path.empty()) {
       cookie::assets::MaterialAsset material_asset;
       std::string material_error;
@@ -403,8 +479,20 @@ int Application::Run() const {
       loaded.vertices = primitive.vertices;
       loaded.indices = primitive.indices;
       loaded.albedo_texture_path = resolved_albedo_texture;
+      loaded.object_transform =
+          cookie::renderer::MultiplyTransforms(
+              cookie::renderer::MakeScaleTransform(
+                  object.transform.scale[0], object.transform.scale[1],
+                  object.transform.scale[2]),
+              cookie::renderer::MakeTranslationTransform(
+                  object.transform.position[0], object.transform.position[1],
+                  object.transform.position[2]));
       loaded_scene_primitives.push_back(std::move(loaded));
     }
+  }
+  if (startup_scene_errors) {
+    logger.Error("Scene object reference validation failed.");
+    return 15;
   }
   logger.Info("Loaded scene primitives from startup scenes: " +
               std::to_string(loaded_scene_primitives.size()));
@@ -533,14 +621,16 @@ int Application::Run() const {
           scene_builder.AddIndexedMeshInstance(
               primitive.vertices.data(), primitive.vertices.size(),
               primitive.indices.data(), primitive.indices.size(), material_index,
-              mesh_transform);
+              cookie::renderer::MultiplyTransforms(
+                  primitive.object_transform, mesh_transform));
         } else {
           scene_builder.AddMeshInstance(
               primitive.vertices.data(), primitive.vertices.size(), material_index,
-              mesh_transform);
+              cookie::renderer::MultiplyTransforms(
+                  primitive.object_transform, mesh_transform));
         }
       }
-    } else {
+    } else if (config_.startup_scene_asset_id.empty()) {
       cookie::renderer::RenderMaterial demo_material{};
       demo_material.albedo_texture_path = resolved_demo_albedo_texture.c_str();
       demo_material.tint[0] = 1.0f;
@@ -553,6 +643,11 @@ int Application::Run() const {
       scene_builder.AddIndexedMeshInstance(
           cube_vertices.data(), cube_vertices.size(), cube_indices.data(),
           cube_indices.size(), demo_material_index, mesh_transform);
+    } else {
+      logger.Error(
+          "Startup scene was configured but produced no renderable primitives.");
+      window->RequestClose();
+      break;
     }
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
