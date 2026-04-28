@@ -12,6 +12,9 @@
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QEvent>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QString>
@@ -23,6 +26,8 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <initializer_list>
 #include <string>
@@ -42,6 +47,45 @@
 namespace {
 
 constexpr float kDegreesToRadians = 0.017453292519943295769f;
+
+struct EditorVec3 {
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+};
+
+EditorVec3 AddVec3(const EditorVec3& a, const EditorVec3& b) {
+  return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+EditorVec3 SubtractVec3(const EditorVec3& a, const EditorVec3& b) {
+  return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+EditorVec3 ScaleVec3(const EditorVec3& value, float scalar) {
+  return {value.x * scalar, value.y * scalar, value.z * scalar};
+}
+
+float LengthVec3(const EditorVec3& value) {
+  return std::sqrt(
+      value.x * value.x + value.y * value.y + value.z * value.z);
+}
+
+EditorVec3 NormalizeVec3(const EditorVec3& value) {
+  const float length = LengthVec3(value);
+  if (length <= 0.000001f) {
+    return {};
+  }
+  return ScaleVec3(value, 1.0f / length);
+}
+
+EditorVec3 CrossVec3(const EditorVec3& a, const EditorVec3& b) {
+  return {
+      a.y * b.z - a.z * b.y,
+      a.z * b.x - a.x * b.z,
+      a.x * b.y - a.y * b.x,
+  };
+}
 
 QDockWidget* CreateDock(
     const QString& title, QWidget* content, QWidget* parent) {
@@ -225,7 +269,23 @@ EditorMainWindow::EditorMainWindow(
   viewport_widget_->setAttribute(Qt::WA_NativeWindow, true);
   viewport_widget_->setAutoFillBackground(true);
   viewport_widget_->setStyleSheet("background-color: #11142A;");
+  viewport_widget_->setFocusPolicy(Qt::StrongFocus);
+  viewport_widget_->setMouseTracking(true);
+  viewport_widget_->installEventFilter(this);
   setCentralWidget(viewport_widget_);
+
+  const EditorVec3 initial_camera_position{
+      viewport_camera_position_[0],
+      viewport_camera_position_[1],
+      viewport_camera_position_[2],
+  };
+  const EditorVec3 initial_target{0.0f, 0.0f, 0.0f};
+  const EditorVec3 initial_forward =
+      NormalizeVec3(SubtractVec3(initial_target, initial_camera_position));
+  viewport_camera_yaw_radians_ =
+      std::atan2(initial_forward.x, initial_forward.z);
+  viewport_camera_pitch_radians_ = std::asin(initial_forward.y);
+  viewport_last_frame_time_ = std::chrono::steady_clock::now();
 
   assets_list_ = new QListWidget(this);
   scene_outliner_list_ = new QListWidget(this);
@@ -916,15 +976,37 @@ void EditorMainWindow::RenderViewportFrame() {
   viewport_renderer_->Clear({0.07f, 0.08f, 0.16f, 1.0f});
 
   cookie::renderer::SceneBuilder scene_builder;
+  const auto now = std::chrono::steady_clock::now();
+  float delta_time_seconds =
+      std::chrono::duration<float>(now - viewport_last_frame_time_).count();
+  viewport_last_frame_time_ = now;
+  if (delta_time_seconds <= 0.0f) {
+    delta_time_seconds = 1.0f / 60.0f;
+  }
+  delta_time_seconds = std::min(delta_time_seconds, 0.1f);
+  UpdateViewportCamera(delta_time_seconds);
+
   const float aspect_ratio =
       static_cast<float>(std::max(1, viewport_widget_->width())) /
       static_cast<float>(std::max(1, viewport_widget_->height()));
   const auto projection = cookie::renderer::MakePerspectiveProjection(
       1.04719755f, aspect_ratio, 0.01f, 100.0f);
+  const EditorVec3 world_up{0.0f, 1.0f, 0.0f};
+  const EditorVec3 forward = NormalizeVec3({
+      std::cos(viewport_camera_pitch_radians_) * std::sin(viewport_camera_yaw_radians_),
+      std::sin(viewport_camera_pitch_radians_),
+      std::cos(viewport_camera_pitch_radians_) * std::cos(viewport_camera_yaw_radians_),
+  });
+  const EditorVec3 camera_position{
+      viewport_camera_position_[0],
+      viewport_camera_position_[1],
+      viewport_camera_position_[2],
+  };
+  const EditorVec3 camera_target = AddVec3(camera_position, forward);
   const auto view = cookie::renderer::MakeLookAtView(
-      4.0f, 3.0f, -7.0f,
-      0.0f, 0.0f, 0.0f,
-      0.0f, 1.0f, 0.0f);
+      camera_position.x, camera_position.y, camera_position.z,
+      camera_target.x, camera_target.y, camera_target.z,
+      world_up.x, world_up.y, world_up.z);
   const auto view_projection = cookie::renderer::MultiplyTransforms(view, projection);
 
   for (std::size_t i = 0; i < viewport_mesh_cache_.size(); ++i) {
@@ -956,4 +1038,162 @@ void EditorMainWindow::RenderViewportFrame() {
 
   viewport_renderer_->SubmitScene(scene_builder.Build());
   viewport_renderer_->EndFrame();
+}
+
+bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
+  if (watched != viewport_widget_ || viewport_widget_ == nullptr || event == nullptr) {
+    return QMainWindow::eventFilter(watched, event);
+  }
+
+  switch (event->type()) {
+    case QEvent::Enter:
+      viewport_is_hovered_ = true;
+      break;
+    case QEvent::Leave:
+      viewport_is_hovered_ = false;
+      viewport_mouse_look_active_ = false;
+      viewport_has_last_mouse_pos_ = false;
+      viewport_pending_mouse_delta_x_ = 0.0f;
+      viewport_pending_mouse_delta_y_ = 0.0f;
+      break;
+    case QEvent::MouseButtonPress: {
+      const auto* mouse_event = static_cast<QMouseEvent*>(event);
+      if (mouse_event->button() == Qt::RightButton) {
+        viewport_mouse_look_active_ = viewport_is_hovered_ || viewport_widget_->hasFocus();
+        viewport_widget_->setFocus();
+        viewport_last_mouse_x_ = mouse_event->position().x();
+        viewport_last_mouse_y_ = mouse_event->position().y();
+        viewport_has_last_mouse_pos_ = true;
+      }
+      break;
+    }
+    case QEvent::MouseButtonRelease: {
+      const auto* mouse_event = static_cast<QMouseEvent*>(event);
+      if (mouse_event->button() == Qt::RightButton) {
+        viewport_mouse_look_active_ = false;
+        viewport_has_last_mouse_pos_ = false;
+      }
+      break;
+    }
+    case QEvent::MouseMove: {
+      const auto* mouse_event = static_cast<QMouseEvent*>(event);
+      if (viewport_mouse_look_active_ && (viewport_is_hovered_ || viewport_widget_->hasFocus())) {
+        const float x = mouse_event->position().x();
+        const float y = mouse_event->position().y();
+        if (viewport_has_last_mouse_pos_) {
+          viewport_pending_mouse_delta_x_ += (x - viewport_last_mouse_x_);
+          viewport_pending_mouse_delta_y_ += (y - viewport_last_mouse_y_);
+        }
+        viewport_last_mouse_x_ = x;
+        viewport_last_mouse_y_ = y;
+        viewport_has_last_mouse_pos_ = true;
+      }
+      break;
+    }
+    case QEvent::FocusOut:
+      viewport_mouse_look_active_ = false;
+      viewport_has_last_mouse_pos_ = false;
+      viewport_key_w_down_ = false;
+      viewport_key_a_down_ = false;
+      viewport_key_s_down_ = false;
+      viewport_key_d_down_ = false;
+      viewport_key_q_down_ = false;
+      viewport_key_e_down_ = false;
+      viewport_key_shift_down_ = false;
+      break;
+    case QEvent::KeyPress:
+    case QEvent::KeyRelease: {
+      const auto* key_event = static_cast<QKeyEvent*>(event);
+      const bool is_down = (event->type() == QEvent::KeyPress);
+      switch (key_event->key()) {
+        case Qt::Key_W:
+          viewport_key_w_down_ = is_down;
+          break;
+        case Qt::Key_A:
+          viewport_key_a_down_ = is_down;
+          break;
+        case Qt::Key_S:
+          viewport_key_s_down_ = is_down;
+          break;
+        case Qt::Key_D:
+          viewport_key_d_down_ = is_down;
+          break;
+        case Qt::Key_Q:
+          viewport_key_q_down_ = is_down;
+          break;
+        case Qt::Key_E:
+          viewport_key_e_down_ = is_down;
+          break;
+        case Qt::Key_Shift:
+          viewport_key_shift_down_ = is_down;
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return QMainWindow::eventFilter(watched, event);
+}
+
+void EditorMainWindow::UpdateViewportCamera(float delta_time_seconds) {
+  if (viewport_mouse_look_active_ && (viewport_is_hovered_ || viewport_widget_->hasFocus())) {
+    constexpr float kMouseSensitivity = 0.0025f;
+    viewport_camera_yaw_radians_ += viewport_pending_mouse_delta_x_ * kMouseSensitivity;
+    viewport_camera_pitch_radians_ -= viewport_pending_mouse_delta_y_ * kMouseSensitivity;
+    viewport_camera_pitch_radians_ =
+        std::clamp(viewport_camera_pitch_radians_, -1.54f, 1.54f);
+  }
+  viewport_pending_mouse_delta_x_ = 0.0f;
+  viewport_pending_mouse_delta_y_ = 0.0f;
+
+  if (!viewport_mouse_look_active_ || !(viewport_is_hovered_ || viewport_widget_->hasFocus())) {
+    return;
+  }
+
+  constexpr float kMoveSpeed = 4.5f;
+  constexpr float kFastMoveSpeed = 11.0f;
+  const float horizontal_sin = std::sin(viewport_camera_yaw_radians_);
+  const float horizontal_cos = std::cos(viewport_camera_yaw_radians_);
+  const EditorVec3 forward_flat = NormalizeVec3({
+      horizontal_sin,
+      0.0f,
+      horizontal_cos,
+  });
+  const EditorVec3 world_up{0.0f, 1.0f, 0.0f};
+  const EditorVec3 right = NormalizeVec3(CrossVec3(world_up, forward_flat));
+
+  EditorVec3 movement{};
+  if (viewport_key_w_down_) {
+    movement = AddVec3(movement, forward_flat);
+  }
+  if (viewport_key_s_down_) {
+    movement = SubtractVec3(movement, forward_flat);
+  }
+  if (viewport_key_d_down_) {
+    movement = AddVec3(movement, right);
+  }
+  if (viewport_key_a_down_) {
+    movement = SubtractVec3(movement, right);
+  }
+  if (viewport_key_e_down_) {
+    movement = AddVec3(movement, world_up);
+  }
+  if (viewport_key_q_down_) {
+    movement = SubtractVec3(movement, world_up);
+  }
+
+  const float movement_length = LengthVec3(movement);
+  if (movement_length <= 0.0001f) {
+    return;
+  }
+  const float speed = viewport_key_shift_down_ ? kFastMoveSpeed : kMoveSpeed;
+  const EditorVec3 direction = ScaleVec3(movement, 1.0f / movement_length);
+  const EditorVec3 delta = ScaleVec3(direction, speed * delta_time_seconds);
+  viewport_camera_position_[0] += delta.x;
+  viewport_camera_position_[1] += delta.y;
+  viewport_camera_position_[2] += delta.z;
 }

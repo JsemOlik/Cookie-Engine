@@ -3,6 +3,7 @@
 #include <QMainWindow>
 
 #include <filesystem>
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -30,6 +31,7 @@ class EditorMainWindow final : public QMainWindow {
       QWidget* parent = nullptr);
 
  private:
+  bool eventFilter(QObject* watched, QEvent* event) override;
   void RefreshAssets();
   void RefreshStartupSceneSelector();
   void RefreshSceneOutliner();
@@ -46,6 +48,7 @@ class EditorMainWindow final : public QMainWindow {
   void ShutdownViewportRenderer();
   void RebuildViewportSceneCache();
   void RenderViewportFrame();
+  void UpdateViewportCamera(float delta_time_seconds);
 
   std::filesystem::path project_root_;
   cookie::assets::AssetRegistry asset_registry_;
@@ -91,4 +94,23 @@ class EditorMainWindow final : public QMainWindow {
   std::vector<cookie::renderer::ImportedPrimitive> viewport_mesh_cache_;
   std::vector<std::string> viewport_mesh_textures_;
   std::vector<cookie::renderer::Float4x4> viewport_mesh_transforms_;
+
+  float viewport_camera_position_[3] = {4.0f, 3.0f, -7.0f};
+  float viewport_camera_yaw_radians_ = 0.0f;
+  float viewport_camera_pitch_radians_ = 0.0f;
+  bool viewport_is_hovered_ = false;
+  bool viewport_mouse_look_active_ = false;
+  bool viewport_has_last_mouse_pos_ = false;
+  float viewport_last_mouse_x_ = 0.0f;
+  float viewport_last_mouse_y_ = 0.0f;
+  float viewport_pending_mouse_delta_x_ = 0.0f;
+  float viewport_pending_mouse_delta_y_ = 0.0f;
+  bool viewport_key_w_down_ = false;
+  bool viewport_key_a_down_ = false;
+  bool viewport_key_s_down_ = false;
+  bool viewport_key_d_down_ = false;
+  bool viewport_key_q_down_ = false;
+  bool viewport_key_e_down_ = false;
+  bool viewport_key_shift_down_ = false;
+  std::chrono::steady_clock::time_point viewport_last_frame_time_{};
 };
