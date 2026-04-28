@@ -109,11 +109,6 @@ if not exist "%EXPORT_ROOT%\content\scenes.pak" (
   set "EXIT_CODE=1"
   goto :end
 )
-if not exist "%EXPORT_ROOT%\content\cooked" (
-  echo [ERROR] Missing cooked payload directory: content\cooked
-  set "EXIT_CODE=1"
-  goto :end
-)
 dir /b /s "%EXPORT_ROOT%\content\*.meta" >nul 2>nul && (
   echo [ERROR] Raw editable .meta files found in shipped content.
   set "EXIT_CODE=1"
@@ -121,6 +116,16 @@ dir /b /s "%EXPORT_ROOT%\content\*.meta" >nul 2>nul && (
 )
 dir /b /s "%EXPORT_ROOT%\content\*.cookieasset" >nul 2>nul && (
   echo [ERROR] Raw editable .cookieasset files found in shipped content.
+  set "EXIT_CODE=1"
+  goto :end
+)
+dir /b /s "%EXPORT_ROOT%\content\*.png" >nul 2>nul && (
+  echo [ERROR] Loose texture payload files found in shipped content.
+  set "EXIT_CODE=1"
+  goto :end
+)
+dir /b /s "%EXPORT_ROOT%\content\*.glb" >nul 2>nul && (
+  echo [ERROR] Loose model payload files found in shipped content.
   set "EXIT_CODE=1"
   goto :end
 )

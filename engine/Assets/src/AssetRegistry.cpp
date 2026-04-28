@@ -1,6 +1,7 @@
 #include "Cookie/Assets/AssetRegistry.h"
 
 #include <algorithm>
+#include <cctype>
 #include <system_error>
 #include <utility>
 
@@ -17,6 +18,21 @@ std::filesystem::path ResolveSourcePathFromMeta(
     const std::filesystem::path& meta_path) {
   const std::string filename = meta_path.filename().string();
   return meta_path.parent_path() / filename.substr(0, filename.size() - 5);
+}
+
+bool StartsWith(std::string_view value, std::string_view prefix) {
+  return value.size() >= prefix.size() &&
+         value.substr(0, prefix.size()) == prefix;
+}
+
+std::string NormalizeCacheKey(std::string value) {
+  for (char& ch : value) {
+    if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '.' && ch != '_' &&
+        ch != '-') {
+      ch = '_';
+    }
+  }
+  return value;
 }
 
 }  // namespace
@@ -115,9 +131,7 @@ bool AssetRegistry::HasAsset(std::string_view asset_id) const {
 std::filesystem::path AssetRegistry::ResolveAssetPath(
     std::string_view asset_id) const {
   if (const CookedAssetRecord* cooked = cooked_registry_.FindByAssetId(asset_id)) {
-    if (!cooked_registry_path_.empty()) {
-      return cooked_registry_path_.parent_path() / cooked->runtime_relative_path;
-    }
+    return ResolveCookedAssetPath(*cooked);
   }
 
   for (const auto& asset : discovered_assets_) {
@@ -134,6 +148,51 @@ std::filesystem::path AssetRegistry::ResolveAssetPath(
     }
   }
   return {};
+}
+
+std::filesystem::path AssetRegistry::ResolveCookedAssetPath(
+    const CookedAssetRecord& record) const {
+  if (cooked_registry_path_.empty()) {
+    return {};
+  }
+
+  if (!StartsWith(record.runtime_relative_path, "pak://")) {
+    return cooked_registry_path_.parent_path() / record.runtime_relative_path;
+  }
+
+  const std::string_view descriptor = record.runtime_relative_path;
+  const std::size_t hash_index = descriptor.find('#');
+  if (hash_index == std::string_view::npos || hash_index <= 6 ||
+      hash_index + 1 >= descriptor.size()) {
+    return {};
+  }
+
+  const std::string archive_relative(descriptor.substr(6, hash_index - 6));
+  const std::string entry_name(descriptor.substr(hash_index + 1));
+  const auto cache_iter = extracted_cache_paths_.find(record.asset_id);
+  if (cache_iter != extracted_cache_paths_.end() &&
+      std::filesystem::exists(cache_iter->second)) {
+    return cache_iter->second;
+  }
+
+  const std::filesystem::path archive_path =
+      cooked_registry_path_.parent_path() / archive_relative;
+  PakArchive archive;
+  if (!archive.Open(archive_path)) {
+    return {};
+  }
+
+  const std::filesystem::path cache_root =
+      cooked_registry_path_.parent_path() / ".asset_cache";
+  const std::filesystem::path extension =
+      std::filesystem::path(entry_name).extension();
+  const std::filesystem::path extracted_path =
+      cache_root / (NormalizeCacheKey(record.asset_id) + extension.string());
+  if (!archive.ReadEntryToFile(entry_name, extracted_path)) {
+    return {};
+  }
+  extracted_cache_paths_[record.asset_id] = extracted_path;
+  return extracted_path;
 }
 
 std::optional<CookedAssetRecord> AssetRegistry::ResolveCookedRecord(

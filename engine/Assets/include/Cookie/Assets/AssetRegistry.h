@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <optional>
+#include <unordered_map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -35,10 +36,13 @@ class AssetRegistry {
   const std::vector<DiscoveredAsset>& GetDiscoveredAssets() const;
 
  private:
+  std::filesystem::path ResolveCookedAssetPath(
+      const CookedAssetRecord& record) const;
   std::vector<MountedPackage> packages_;
   CookedAssetRegistry cooked_registry_;
   std::filesystem::path cooked_registry_path_;
   std::vector<DiscoveredAsset> discovered_assets_;
+  mutable std::unordered_map<std::string, std::filesystem::path> extracted_cache_paths_;
 };
 
 } // namespace cookie::assets

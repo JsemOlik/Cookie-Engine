@@ -34,7 +34,8 @@ BuildProfile ParseBuildProfile(const std::string& value);
 const char* ToString(BuildProfile profile);
 
 // Future editor path should call this API directly. This produces the shipped
-// runtime layout with cooked payloads + package manifests (no raw .meta/.cookieasset).
+// runtime layout with cooked payload bytes packed into .pak archives
+// (no raw .meta/.cookieasset or loose cooked payload files).
 ExportResult BuildCookPackage(const BuildCookPackageOptions& options);
 
 }  // namespace cookie::tools

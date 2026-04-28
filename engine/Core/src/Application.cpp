@@ -313,11 +313,17 @@ int Application::Run() const {
   if (const auto cooked_record =
           assets.ResolveCookedRecord(config_.demo_albedo_asset_id)) {
     resolved_demo_albedo_texture_path =
-        paths.project_root / "content" / cooked_record->runtime_relative_path;
-    logger.Info("Resolved demo albedo from cooked registry asset id '" +
-                config_.demo_albedo_asset_id + "' to '" +
-                resolved_demo_albedo_texture_path.string() + "'.");
-  } else {
+        assets.ResolveAssetPath(config_.demo_albedo_asset_id);
+    if (!resolved_demo_albedo_texture_path.empty()) {
+      logger.Info("Resolved demo albedo from cooked registry asset id '" +
+                  config_.demo_albedo_asset_id + "' to '" +
+                  resolved_demo_albedo_texture_path.string() + "'.");
+    } else {
+      logger.Info("Cooked record exists but payload resolve failed for asset id '" +
+                  config_.demo_albedo_asset_id + "'.");
+    }
+  }
+  if (resolved_demo_albedo_texture_path.empty()) {
     resolved_demo_albedo_texture_path =
         assets.ResolveAssetPath(config_.demo_albedo_asset_id);
     if (resolved_demo_albedo_texture_path.empty()) {
@@ -330,6 +336,10 @@ int Application::Run() const {
       }
       logger.Info("Cooked registry missing asset id; fallback path used: " +
                   resolved_demo_albedo_texture_path.string());
+    } else if (assets.ResolveCookedRecord(config_.demo_albedo_asset_id).has_value()) {
+      logger.Info("Resolved demo albedo asset id via archive extraction fallback: '" +
+                  config_.demo_albedo_asset_id + "' -> '" +
+                  resolved_demo_albedo_texture_path.string() + "'.");
     } else {
       logger.Info("Resolved demo albedo asset id via mounted package/source: '" +
                   config_.demo_albedo_asset_id + "' -> '" +
