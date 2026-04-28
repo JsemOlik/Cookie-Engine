@@ -38,6 +38,18 @@ bool AssetRegistry::HasAsset(std::string_view asset_id) const {
   return false;
 }
 
+std::filesystem::path AssetRegistry::ResolveAssetPath(
+    std::string_view asset_id) const {
+  for (const auto& package : packages_) {
+    const auto iter = std::find(package.asset_ids.begin(), package.asset_ids.end(),
+                                asset_id);
+    if (iter != package.asset_ids.end()) {
+      return package.pak_path.parent_path() / *iter;
+    }
+  }
+  return {};
+}
+
 std::vector<std::string> AssetRegistry::ListAssetIds() const {
   std::vector<std::string> all_assets;
   all_assets.reserve(GetAssetCount());

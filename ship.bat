@@ -84,6 +84,16 @@ if not exist "%EXPORT_ROOT%\content\base.pak" (
   set "EXIT_CODE=1"
   goto :end
 )
+if not exist "%EXPORT_ROOT%\content\textures\debug.png" (
+  echo [ERROR] Missing texture asset: content\textures\debug.png
+  set "EXIT_CODE=1"
+  goto :end
+)
+if not exist "%EXPORT_ROOT%\content\models\test_mesh.glb" (
+  echo [ERROR] Missing mesh asset: content\models\test_mesh.glb
+  set "EXIT_CODE=1"
+  goto :end
+)
 if not exist "%EXPORT_ROOT%\config\engine.json" (
   echo [ERROR] Missing config: config\engine.json
   set "EXIT_CODE=1"

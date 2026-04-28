@@ -511,7 +511,7 @@ int main(int argc, char** argv) {
       .audio_module_path = audio_bootstrap.module_path,
       .window_title = renderer_config.window_title,
       .camera_mode = renderer_config.camera_mode,
-      .demo_albedo_texture = renderer_config.demo_albedo_texture,
+      .demo_albedo_asset_id = renderer_config.demo_albedo_asset_id,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .clear_color = renderer_config.clear_color,

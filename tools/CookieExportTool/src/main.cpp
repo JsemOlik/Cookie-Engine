@@ -95,11 +95,53 @@ void CopyDirectoryContents(
     return;
   }
 
-  fs::create_directories(destination_dir);
-  for (const auto& entry : fs::directory_iterator(source_dir)) {
-    const fs::path destination = destination_dir / entry.path().filename();
-    if (entry.is_regular_file()) {
-      fs::copy_file(entry.path(), destination, fs::copy_options::overwrite_existing);
+  std::error_code error;
+  fs::create_directories(destination_dir, error);
+  if (error) {
+    result.warnings.push_back(
+        "Failed to create export directory: " + destination_dir.string());
+    return;
+  }
+
+  for (const auto& entry : fs::recursive_directory_iterator(source_dir)) {
+    const auto relative_path = fs::relative(entry.path(), source_dir, error);
+    if (error) {
+      result.warnings.push_back(
+          "Failed to compute relative path for: " + entry.path().string());
+      error.clear();
+      continue;
+    }
+
+    const fs::path destination = destination_dir / relative_path;
+    if (entry.is_directory()) {
+      fs::create_directories(destination, error);
+      if (error) {
+        result.warnings.push_back(
+            "Failed to create export subdirectory: " + destination.string());
+        error.clear();
+      }
+      continue;
+    }
+
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+
+    fs::create_directories(destination.parent_path(), error);
+    if (error) {
+      result.warnings.push_back(
+          "Failed to create parent directory for: " + destination.string());
+      error.clear();
+      continue;
+    }
+
+    fs::copy_file(
+        entry.path(), destination, fs::copy_options::overwrite_existing, error);
+    if (error) {
+      result.warnings.push_back(
+          "Failed to copy file: " + entry.path().string() + " -> " +
+          destination.string());
+      error.clear();
     }
   }
 }

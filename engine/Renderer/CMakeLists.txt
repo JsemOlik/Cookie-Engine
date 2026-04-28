@@ -1,4 +1,5 @@
 add_library(cookie_renderer STATIC
+  src/MeshAsset.cpp
   src/Primitives.cpp
   src/SceneBuilder.cpp
   src/RendererConfig.cpp

@@ -13,6 +13,7 @@
 #include "Cookie/Assets/AssetRegistry.h"
 #include "Cookie/Platform/PlatformPaths.h"
 #include "Cookie/Platform/PlatformWindow.h"
+#include "Cookie/Renderer/MeshAsset.h"
 #include "Cookie/Renderer/Primitives.h"
 #include "Cookie/Renderer/SceneBuilder.h"
 #include "Cookie/Renderer/Transform.h"
@@ -118,7 +119,7 @@ int Application::Run() const {
   logger.Info("Window size: " + std::to_string(config_.window_width) + "x" +
               std::to_string(config_.window_height));
   logger.Info("Camera mode: " + config_.camera_mode);
-  logger.Info("Demo albedo texture: " + config_.demo_albedo_texture);
+  logger.Info("Demo albedo asset id: " + config_.demo_albedo_asset_id);
   logger.Info("Fly camera controls: mouse look, WASD move, Q/E vertical, Shift speed.");
   logger.Info("Project root: " + paths.project_root.string());
   logger.Info("Config directory: " + paths.config_dir.string());
@@ -244,14 +245,44 @@ int Application::Run() const {
   int frame_count = 0;
   const auto frame_start_time = std::chrono::steady_clock::now();
   auto last_frame_time = frame_start_time;
-  std::filesystem::path demo_albedo_texture_path(config_.demo_albedo_texture);
-  if (!demo_albedo_texture_path.empty() &&
-      demo_albedo_texture_path.is_relative()) {
-    demo_albedo_texture_path = paths.project_root / demo_albedo_texture_path;
+  std::filesystem::path resolved_demo_albedo_texture_path =
+      assets.ResolveAssetPath(config_.demo_albedo_asset_id);
+  if (resolved_demo_albedo_texture_path.empty()) {
+    // Backward-compatible fallback for direct path config values.
+    resolved_demo_albedo_texture_path = config_.demo_albedo_asset_id;
+    if (!resolved_demo_albedo_texture_path.empty() &&
+        resolved_demo_albedo_texture_path.is_relative()) {
+      resolved_demo_albedo_texture_path =
+          paths.project_root / resolved_demo_albedo_texture_path;
+    }
+    logger.Info("Demo albedo asset id not found in mounted packages, "
+                "falling back to path: " +
+                resolved_demo_albedo_texture_path.string());
+  } else {
+    logger.Info("Resolved demo albedo asset id '" +
+                config_.demo_albedo_asset_id + "' to '" +
+                resolved_demo_albedo_texture_path.string() + "'.");
   }
   const std::string resolved_demo_albedo_texture =
-      demo_albedo_texture_path.string();
+      resolved_demo_albedo_texture_path.string();
   cookie::renderer::SceneBuilder scene_builder;
+  cookie::renderer::ImportedMesh imported_mesh;
+  bool has_imported_mesh = false;
+  {
+    const auto imported_mesh_path = paths.project_root / "content" / "models" /
+                                    "test_mesh.glb";
+    std::string imported_mesh_error;
+    has_imported_mesh = cookie::renderer::LoadMeshFromPath(
+        imported_mesh_path, imported_mesh, &imported_mesh_error);
+    if (has_imported_mesh) {
+      logger.Info("Loaded imported mesh: " + imported_mesh_path.string() +
+                  " (primitives: " +
+                  std::to_string(imported_mesh.primitives.size()) + ")");
+    } else {
+      logger.Info("Imported mesh load skipped/fallback in use: " +
+                  imported_mesh_path.string() + " (" + imported_mesh_error + ")");
+    }
+  }
   const auto cube_vertices = cookie::renderer::MakeColoredCubeVertices();
   const auto cube_indices = cookie::renderer::MakeCubeIndices();
   const float aspect_ratio =
@@ -370,12 +401,26 @@ int Application::Run() const {
             cookie::renderer::MultiplyTransforms(
                 cookie::renderer::MakeYRotationTransform(angle * 0.65f),
                 cookie::renderer::MakeZRotationTransform(angle * 0.45f)));
-    const auto cube_transform =
+    const auto mesh_transform =
         cookie::renderer::MultiplyTransforms(world, view_projection);
-    scene_builder.AddIndexedMeshInstance(
-        cube_vertices.data(), cube_vertices.size(),
-        cube_indices.data(), cube_indices.size(), demo_material_index,
-        cube_transform);
+    if (has_imported_mesh) {
+      for (const auto& primitive : imported_mesh.primitives) {
+        if (!primitive.indices.empty()) {
+          scene_builder.AddIndexedMeshInstance(
+              primitive.vertices.data(), primitive.vertices.size(),
+              primitive.indices.data(), primitive.indices.size(),
+              demo_material_index, mesh_transform);
+        } else {
+          scene_builder.AddMeshInstance(
+              primitive.vertices.data(), primitive.vertices.size(),
+              demo_material_index, mesh_transform);
+        }
+      }
+    } else {
+      scene_builder.AddIndexedMeshInstance(
+          cube_vertices.data(), cube_vertices.size(), cube_indices.data(),
+          cube_indices.size(), demo_material_index, mesh_transform);
+    }
     renderer_backend_->SubmitScene(scene_builder.Build());
     renderer_backend_->EndFrame();
 

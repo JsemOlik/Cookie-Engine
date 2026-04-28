@@ -223,10 +223,17 @@ RendererConfig LoadRendererConfig(const std::filesystem::path& graphics_config_p
     config.camera_mode = parsed_camera_mode;
   }
 
-  const std::string parsed_demo_albedo_texture =
-      ExtractStringValue(contents, "demo_albedo_texture");
-  if (!parsed_demo_albedo_texture.empty()) {
-    config.demo_albedo_texture = parsed_demo_albedo_texture;
+  const std::string parsed_demo_albedo_asset_id =
+      ExtractStringValue(contents, "demo_albedo_asset_id");
+  if (!parsed_demo_albedo_asset_id.empty()) {
+    config.demo_albedo_asset_id = parsed_demo_albedo_asset_id;
+  } else {
+    // Backward compatibility with older config key/value style.
+    const std::string parsed_demo_albedo_texture =
+        ExtractStringValue(contents, "demo_albedo_texture");
+    if (!parsed_demo_albedo_texture.empty()) {
+      config.demo_albedo_asset_id = parsed_demo_albedo_texture;
+    }
   }
 
   const int parsed_width = ExtractIntegerValue(contents, "window_width");

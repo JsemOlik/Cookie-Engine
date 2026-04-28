@@ -1,7 +1,7 @@
 {
   "renderer": "dx11",
   "camera_mode": "perspective",
-  "demo_albedo_texture": "content/textures/debug.png",
+  "demo_albedo_asset_id": "textures/debug.png",
   "window_title": "Cookie Engine Runtime",
   "window_width": 1280,
   "window_height": 720,
