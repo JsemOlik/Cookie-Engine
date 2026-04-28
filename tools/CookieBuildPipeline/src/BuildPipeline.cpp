@@ -12,6 +12,7 @@
 #include <exception>
 #include <fstream>
 #include <map>
+#include <set>
 #include <system_error>
 
 namespace fs = std::filesystem;
@@ -21,6 +22,11 @@ namespace {
 
 void AddWarning(ExportResult& result, const std::string& message) {
   result.warnings.push_back(ExportWarning{message});
+}
+
+void AddError(ExportResult& result, const std::string& message) {
+  result.success = false;
+  AddWarning(result, message);
 }
 
 bool CopyFileIfExists(
@@ -214,15 +220,15 @@ void WriteExportReport(
   }
 }
 
-void BuildCookedRegistryArtifact(
+bool BuildCookedRegistryArtifact(
     const fs::path& project_root, const fs::path& export_content_dir,
     ExportResult& result) {
   cookie::assets::CookedAssetRegistry registry;
   const fs::path content_root = project_root / "content";
 
   if (!fs::exists(content_root)) {
-    AddWarning(result, "Cannot build cooked registry; missing content directory.");
-    return;
+    AddError(result, "Cannot build cooked registry; missing content directory.");
+    return false;
   }
 
   std::error_code error;
@@ -258,14 +264,14 @@ void BuildCookedRegistryArtifact(
     cookie::assets::AssetMeta meta;
     std::string parse_error;
     if (!cookie::assets::LoadAssetMeta(meta_path, meta, &parse_error)) {
-      AddWarning(result, parse_error);
+      AddError(result, "Invalid .meta file: " + parse_error);
       continue;
     }
 
     const fs::path source_path =
         meta_path.parent_path() / meta_filename.substr(0, meta_filename.size() - 5);
     if (!fs::exists(source_path)) {
-      AddWarning(result, "Missing source payload for meta: " + source_path.string());
+      AddError(result, "Missing source payload for meta: " + source_path.string());
       continue;
     }
 
@@ -320,14 +326,14 @@ void BuildCookedRegistryArtifact(
 
   const fs::path registry_path = export_content_dir / "cooked_assets.pakreg";
   if (!registry.SaveToFile(registry_path)) {
-    AddWarning(result, "Failed to write cooked registry: " + registry_path.string());
+    AddError(result, "Failed to write cooked registry: " + registry_path.string());
   }
 
   for (auto& [package_name, entries] : package_entries) {
     const fs::path pak_path = export_content_dir / package_name;
     std::string write_error;
     if (!cookie::assets::WritePakArchive(pak_path, entries, &write_error)) {
-      AddWarning(
+      AddError(
           result, "Failed to write package archive: " + pak_path.string() +
                       " (" + write_error + ")");
       continue;
@@ -354,10 +360,34 @@ void BuildCookedRegistryArtifact(
   const fs::path base_pak_path = export_content_dir / "base.pak";
   std::string base_error;
   if (!cookie::assets::WritePakArchive(base_pak_path, base_entries, &base_error)) {
-    AddWarning(
+    AddError(
         result, "Failed to write base package archive: " + base_pak_path.string() +
                     " (" + base_error + ")");
   }
+
+  if (registry.Entries().empty()) {
+    AddError(result, "Cooked registry produced zero assets; refusing export.");
+    return false;
+  }
+
+  std::set<std::string> registry_ids;
+  for (const auto& record : registry.Entries()) {
+    registry_ids.insert(record.asset_id);
+  }
+  for (const auto& record : registry.Entries()) {
+    for (const auto& dependency : record.dependencies) {
+      if (dependency.empty()) {
+        continue;
+      }
+      if (registry_ids.find(dependency) == registry_ids.end()) {
+        AddError(
+            result,
+            "Missing dependency asset in cooked registry: " + record.asset_id +
+                " -> " + dependency);
+      }
+    }
+  }
+  return result.success;
 }
 
 }  // namespace
@@ -402,6 +432,26 @@ ExportResult BuildCookPackage(const BuildCookPackageOptions& options) {
     fs::create_directories(export_content);
     fs::create_directories(export_config);
     fs::create_directories(export_logs);
+
+    if (options.project_root.empty() || !fs::exists(project_root / "content") ||
+        !fs::exists(project_root / "config")) {
+      AddError(
+          result,
+          "Invalid project root for export: expected config/ and content/ at " +
+              project_root.string());
+      WriteExportReport(export_root / "export_report.txt", options, result);
+      return result;
+    }
+
+    if (options.runtime_build_dir.empty() ||
+        !fs::exists(runtime_build_dir / "CookieRuntime.exe")) {
+      AddError(
+          result,
+          "Invalid runtime build dir: missing CookieRuntime.exe at " +
+              (runtime_build_dir / "CookieRuntime.exe").string());
+      WriteExportReport(export_root / "export_report.txt", options, result);
+      return result;
+    }
 
     const fs::path runtime_exe_source = runtime_build_dir / "CookieRuntime.exe";
     const fs::path runtime_exe_destination = export_root / (options.game_name + ".exe");

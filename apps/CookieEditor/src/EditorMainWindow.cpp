@@ -15,6 +15,10 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include <vector>
+#include <algorithm>
+#include <cctype>
+
 #include "Cookie/Assets/AssetMeta.h"
 #include "Cookie/Assets/SceneAsset.h"
 #include "Cookie/Core/GameConfig.h"
@@ -84,6 +88,32 @@ std::filesystem::path DetectProjectRoot(std::filesystem::path start) {
 bool IsProjectRoot(const std::filesystem::path& candidate) {
   return std::filesystem::exists(candidate / "config" / "game.json") &&
          std::filesystem::exists(candidate / "content");
+}
+
+bool HasRuntimeArtifacts(const std::filesystem::path& runtime_build_dir) {
+  return std::filesystem::exists(runtime_build_dir / "CookieRuntime.exe") &&
+         std::filesystem::exists(runtime_build_dir / "bin" / "Core.dll") &&
+         std::filesystem::exists(runtime_build_dir / "bin" / "RendererDX11.dll");
+}
+
+std::filesystem::path DetectDefaultRuntimeBuildDir(
+    const std::filesystem::path& project_root) {
+  const std::vector<std::filesystem::path> candidates = {
+      std::filesystem::path("C:/ce-build/x64-debug-vcpkg/apps/CookieRuntime"),
+      std::filesystem::path("C:/ce-build/x64-release-vcpkg/apps/CookieRuntime"),
+      (project_root / ".." / ".." / "ce-build" / "x64-debug-vcpkg" / "apps" /
+       "CookieRuntime")
+          .lexically_normal(),
+      (project_root / ".." / ".." / "ce-build" / "x64-release-vcpkg" / "apps" /
+       "CookieRuntime")
+          .lexically_normal(),
+  };
+  for (const auto& candidate : candidates) {
+    if (HasRuntimeArtifacts(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates.front();
 }
 
 std::filesystem::path ResolveEditorProjectRoot(
@@ -168,12 +198,10 @@ EditorMainWindow::EditorMainWindow(
   auto* build_layout = new QVBoxLayout(build_panel);
   auto* form_layout = new QFormLayout();
   game_name_input_ = new QLineEdit("MyGame", build_panel);
+  const auto detected_runtime_build_dir = DetectDefaultRuntimeBuildDir(project_root_);
   runtime_build_dir_input_ =
       new QLineEdit(QString::fromStdString(
-          (project_root_ / ".." / ".." / "ce-build" / "x64-release-vcpkg" /
-           "apps" / "CookieRuntime")
-              .lexically_normal()
-              .string()),
+          detected_runtime_build_dir.string()),
                     build_panel);
   export_parent_input_ = new QLineEdit(
       QString::fromStdString((project_root_ / "out" / "ship").string()),
@@ -202,15 +230,57 @@ EditorMainWindow::EditorMainWindow(
 
   connect(run_export_button, &QPushButton::clicked, this, [this, profile_combo,
                                                             debug_logging_combo]() {
+    const auto runtime_build_dir = std::filesystem::path(
+        runtime_build_dir_input_->text().trimmed().toStdString());
+    if (!HasRuntimeArtifacts(runtime_build_dir)) {
+      build_output_->setPlainText(
+          "Export status: failed\n"
+          "Runtime Build Dir is invalid or incomplete.\n"
+          "Expected at least:\n"
+          " - CookieRuntime.exe\n"
+          " - bin/Core.dll\n"
+          " - bin/RendererDX11.dll\n"
+          "Check Runtime Build Dir in Build/Export panel.");
+      statusBar()->showMessage("Export failed: invalid runtime build dir");
+      return;
+    }
+
     cookie::tools::BuildCookPackageOptions options;
     options.project_root = project_root_;
-    options.runtime_build_dir =
-        runtime_build_dir_input_->text().trimmed().toStdString();
+    options.runtime_build_dir = runtime_build_dir;
     options.export_parent_dir = export_parent_input_->text().trimmed().toStdString();
     options.game_name = game_name_input_->text().trimmed().toStdString();
     options.profile = cookie::tools::ParseBuildProfile(
         profile_combo->currentText().toStdString());
     options.debug_logging = (debug_logging_combo->currentText() == "true");
+
+    std::string runtime_dir_lower = options.runtime_build_dir.string();
+    std::transform(
+        runtime_dir_lower.begin(), runtime_dir_lower.end(),
+        runtime_dir_lower.begin(),
+        [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    const bool runtime_is_debug =
+        runtime_dir_lower.find("x64-debug-vcpkg") != std::string::npos;
+    const bool runtime_is_release =
+        runtime_dir_lower.find("x64-release-vcpkg") != std::string::npos;
+    if (options.profile == cookie::tools::BuildProfile::kRelease &&
+        runtime_is_debug) {
+      build_output_->setPlainText(
+          "Export status: failed\n"
+          "Profile/runtime mismatch: selected profile is 'release' but Runtime Build Dir points to debug build.\n"
+          "Use C:/ce-build/x64-release-vcpkg/apps/CookieRuntime for release export.");
+      statusBar()->showMessage("Export failed: release profile requires release runtime dir");
+      return;
+    }
+    if (options.profile == cookie::tools::BuildProfile::kDev &&
+        runtime_is_release) {
+      build_output_->setPlainText(
+          "Export status: failed\n"
+          "Profile/runtime mismatch: selected profile is 'dev' but Runtime Build Dir points to release build.\n"
+          "Use C:/ce-build/x64-debug-vcpkg/apps/CookieRuntime for dev export.");
+      statusBar()->showMessage("Export failed: dev profile requires debug runtime dir");
+      return;
+    }
 
     const auto result = cookie::tools::BuildCookPackage(options);
     QString output = "Export status: ";
