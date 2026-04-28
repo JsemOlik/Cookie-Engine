@@ -2,6 +2,8 @@
 
 #include "Cookie/Assets/AssetMeta.h"
 #include "Cookie/Assets/CookedAssetRegistry.h"
+#include "Cookie/Assets/MaterialAsset.h"
+#include "Cookie/Assets/SceneAsset.h"
 
 #include <algorithm>
 #include <cctype>
@@ -263,6 +265,33 @@ void BuildCookedRegistryArtifact(
       error.clear();
     }
     record.dependencies = meta.dependencies;
+    if (record.dependencies.empty()) {
+      if (meta.type == "Scene" || meta.type == "SceneAsset") {
+        cookie::assets::SceneAsset scene_asset;
+        if (cookie::assets::LoadSceneAsset(source_path, scene_asset, nullptr)) {
+          for (const auto& nested : scene_asset.nested_scene_asset_ids) {
+            if (!nested.empty()) {
+              record.dependencies.push_back(nested);
+            }
+          }
+          for (const auto& object : scene_asset.objects) {
+            if (!object.mesh_asset_id.empty()) {
+              record.dependencies.push_back(object.mesh_asset_id);
+            }
+            if (!object.material_asset_id.empty()) {
+              record.dependencies.push_back(object.material_asset_id);
+            }
+          }
+        }
+      } else if (meta.type == "Material" || meta.type == "MaterialAsset") {
+        cookie::assets::MaterialAsset material_asset;
+        if (cookie::assets::LoadMaterialAsset(
+                source_path, material_asset, nullptr) &&
+            !material_asset.albedo_asset_id.empty()) {
+          record.dependencies.push_back(material_asset.albedo_asset_id);
+        }
+      }
+    }
     registry.AddOrReplace(std::move(record));
   }
 

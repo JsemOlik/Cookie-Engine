@@ -10,6 +10,7 @@
 class QListWidget;
 class QLineEdit;
 class QTextEdit;
+class QComboBox;
 
 class EditorMainWindow final : public QMainWindow {
   Q_OBJECT
@@ -19,13 +20,17 @@ class EditorMainWindow final : public QMainWindow {
 
  private:
   void RefreshAssets();
+  void RefreshStartupSceneSelector();
+  void RefreshSceneOutliner();
   void UpdateMetaInspector(int index);
 
   std::filesystem::path project_root_;
   cookie::assets::AssetRegistry asset_registry_;
   std::vector<cookie::assets::DiscoveredAsset> discovered_assets_;
   QListWidget* assets_list_ = nullptr;
+  QListWidget* scene_outliner_list_ = nullptr;
   QTextEdit* meta_inspector_ = nullptr;
+  QComboBox* startup_scene_selector_ = nullptr;
   QLineEdit* game_name_input_ = nullptr;
   QLineEdit* runtime_build_dir_input_ = nullptr;
   QLineEdit* export_parent_input_ = nullptr;

@@ -15,6 +15,8 @@
 #include <QWidget>
 
 #include "Cookie/Assets/AssetMeta.h"
+#include "Cookie/Assets/SceneAsset.h"
+#include "Cookie/Core/GameConfig.h"
 #include "Cookie/Tools/BuildPipeline.h"
 
 namespace {
@@ -69,11 +71,27 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
   setCentralWidget(scene_viewport);
 
   assets_list_ = new QListWidget(this);
+  scene_outliner_list_ = new QListWidget(this);
   meta_inspector_ = new QTextEdit(this);
   meta_inspector_->setReadOnly(true);
+  startup_scene_selector_ = new QComboBox(this);
 
   connect(assets_list_, &QListWidget::currentRowChanged, this,
           [this](const int index) { UpdateMetaInspector(index); });
+  connect(startup_scene_selector_, &QComboBox::currentTextChanged, this,
+          [this](const QString& text) {
+            const QString selected_asset_id = text.section(' ', 0, 0);
+            if (selected_asset_id.isEmpty()) {
+              return;
+            }
+            auto game_config =
+                cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
+            game_config.startup_scene_asset_id = selected_asset_id.toStdString();
+            cookie::core::SaveGameConfig(
+                project_root_ / "config" / "game.json", game_config);
+            statusBar()->showMessage("Updated startup scene AssetId in config/game.json");
+            RefreshSceneOutliner();
+          });
 
   auto* build_panel = new QWidget(this);
   auto* build_layout = new QVBoxLayout(build_panel);
@@ -100,6 +118,7 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
   form_layout->addRow("Game Name", game_name_input_);
   form_layout->addRow("Runtime Build Dir", runtime_build_dir_input_);
   form_layout->addRow("Export Parent Dir", export_parent_input_);
+  form_layout->addRow("Startup Scene", startup_scene_selector_);
   form_layout->addRow("Profile", profile_combo);
   form_layout->addRow("Debug Logging", debug_logging_combo);
   build_layout->addLayout(form_layout);
@@ -150,6 +169,8 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
                 CreateDock("Assets", assets_list_, this));
   addDockWidget(Qt::BottomDockWidgetArea,
                 CreateDock("Build/Export", build_panel, this));
+  addDockWidget(Qt::LeftDockWidgetArea,
+                CreateDock("Scene Outliner", scene_outliner_list_, this));
   addDockWidget(Qt::RightDockWidgetArea,
                 CreateDock(
                     "Game Viewport",
@@ -159,7 +180,9 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
   file_menu->addAction("E&xit", this, &QWidget::close);
 
   RefreshAssets();
-  statusBar()->showMessage("Cookie Editor Phase 24A shell loaded");
+  RefreshStartupSceneSelector();
+  RefreshSceneOutliner();
+  statusBar()->showMessage("Cookie Editor Phase 24B shell loaded");
 }
 
 void EditorMainWindow::RefreshAssets() {
@@ -181,6 +204,9 @@ void EditorMainWindow::RefreshAssets() {
     meta_inspector_->setPlainText(
         "No .meta-backed assets found under project Assets/ or content/.");
   }
+
+  RefreshStartupSceneSelector();
+  RefreshSceneOutliner();
 }
 
 void EditorMainWindow::UpdateMetaInspector(const int index) {
@@ -190,4 +216,68 @@ void EditorMainWindow::UpdateMetaInspector(const int index) {
   }
 
   meta_inspector_->setPlainText(BuildMetaSummary(discovered_assets_[index]));
+}
+
+void EditorMainWindow::RefreshStartupSceneSelector() {
+  startup_scene_selector_->clear();
+  auto game_config = cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
+
+  int selected_index = -1;
+  int index = 0;
+  for (const auto& asset : discovered_assets_) {
+    if (asset.meta.type != "Scene" && asset.meta.type != "SceneAsset") {
+      continue;
+    }
+    const QString label = QString::fromStdString(asset.meta.asset_id) + " (" +
+                          QString::fromStdString(asset.source_relative_path) + ")";
+    startup_scene_selector_->addItem(label);
+    if (asset.meta.asset_id == game_config.startup_scene_asset_id) {
+      selected_index = index;
+    }
+    ++index;
+  }
+
+  if (selected_index >= 0) {
+    startup_scene_selector_->setCurrentIndex(selected_index);
+  } else if (startup_scene_selector_->count() > 0) {
+    startup_scene_selector_->setCurrentIndex(0);
+  }
+}
+
+void EditorMainWindow::RefreshSceneOutliner() {
+  scene_outliner_list_->clear();
+  const auto game_config = cookie::core::LoadGameConfig(project_root_ / "config" / "game.json");
+  if (game_config.startup_scene_asset_id.empty()) {
+    scene_outliner_list_->addItem("No startup scene AssetId configured.");
+    return;
+  }
+
+  const auto scene_path =
+      asset_registry_.ResolveAssetPath(game_config.startup_scene_asset_id);
+  if (scene_path.empty()) {
+    scene_outliner_list_->addItem(
+        "Startup scene not resolved: " +
+        QString::fromStdString(game_config.startup_scene_asset_id));
+    return;
+  }
+
+  cookie::assets::SceneAsset scene_asset;
+  std::string scene_error;
+  if (!cookie::assets::LoadSceneAsset(scene_path, scene_asset, &scene_error)) {
+    scene_outliner_list_->addItem(
+        "Failed to load scene: " + QString::fromStdString(scene_error));
+    return;
+  }
+
+  scene_outliner_list_->addItem(
+      "Scene AssetId: " + QString::fromStdString(game_config.startup_scene_asset_id));
+  for (const auto& nested_id : scene_asset.nested_scene_asset_ids) {
+    scene_outliner_list_->addItem("Nested Scene: " + QString::fromStdString(nested_id));
+  }
+  for (const auto& object : scene_asset.objects) {
+    scene_outliner_list_->addItem("Object: " + QString::fromStdString(object.name));
+    scene_outliner_list_->addItem("  Mesh: " + QString::fromStdString(object.mesh_asset_id));
+    scene_outliner_list_->addItem(
+        "  Material: " + QString::fromStdString(object.material_asset_id));
+  }
 }

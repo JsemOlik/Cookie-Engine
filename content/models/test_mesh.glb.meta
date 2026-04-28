@@ -1,0 +1,8 @@
+# Cookie Engine Asset Meta v0
+asset_id: 3f6f3f8e0fb0478a9fcb76ae4f8ddad1
+type: Mesh
+importer: GLTFMeshImporter
+importer_version: 1
+source_fingerprint: sha256:pending
+setting.generate_tangents: false
+label: demo

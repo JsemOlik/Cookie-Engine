@@ -1,2 +1,6 @@
 # asset_id|type|runtime_relative_path|source_relative_path|deps
 7f3a9d1c2e9b4a7f8d1234567890abcd|Texture2D|textures/debug.png|content/textures/debug.png|
+3f6f3f8e0fb0478a9fcb76ae4f8ddad1|Mesh|models/test_mesh.glb|content/models/test_mesh.glb|
+b77168f8f9e147ef9c8e387f532de8f1|Material|materials/default.cookieasset|content/materials/default.cookieasset|7f3a9d1c2e9b4a7f8d1234567890abcd
+c5f9bb8b1c2344d2a7836f2d0ec7f2ce|Scene|scenes/player.scene.cookieasset|content/scenes/player.scene.cookieasset|3f6f3f8e0fb0478a9fcb76ae4f8ddad1,b77168f8f9e147ef9c8e387f532de8f1
+2e5d1005d0f0496f8c4e8f86d2318d14|Scene|scenes/sample.scene.cookieasset|content/scenes/sample.scene.cookieasset|c5f9bb8b1c2344d2a7836f2d0ec7f2ce,3f6f3f8e0fb0478a9fcb76ae4f8ddad1,b77168f8f9e147ef9c8e387f532de8f1

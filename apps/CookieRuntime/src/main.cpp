@@ -2,6 +2,7 @@
 #include "Cookie/Core/AudioBackend.h"
 #include "Cookie/Core/ConfigPaths.h"
 #include "Cookie/Core/EngineConfig.h"
+#include "Cookie/Core/GameConfig.h"
 #include "Cookie/Core/PhysicsBackend.h"
 #include "Cookie/Audio/NullAudioBackend.h"
 #include "Cookie/Platform/PlatformLibrary.h"
@@ -481,6 +482,8 @@ int main(int argc, char** argv) {
   const auto core_bootstrap = ProbeCoreModule(engine_config, paths);
   const cookie::renderer::RendererConfig renderer_config =
       cookie::renderer::LoadRendererConfig(paths.graphics_config);
+  const cookie::core::GameConfig game_config =
+      cookie::core::LoadGameConfig(paths.game_config);
   auto renderer_bootstrap =
       CreateRendererBackend(renderer_config.backend_name, engine_config, paths);
   auto audio_bootstrap = CreateAudioBackend(engine_config, paths);
@@ -512,6 +515,7 @@ int main(int argc, char** argv) {
       .window_title = renderer_config.window_title,
       .camera_mode = renderer_config.camera_mode,
       .demo_albedo_asset_id = renderer_config.demo_albedo_asset_id,
+      .startup_scene_asset_id = game_config.startup_scene_asset_id,
       .window_width = renderer_config.window_width,
       .window_height = renderer_config.window_height,
       .clear_color = renderer_config.clear_color,

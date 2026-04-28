@@ -31,6 +31,7 @@ struct ApplicationConfig {
   std::string window_title;
   std::string camera_mode = "perspective";
   std::string demo_albedo_asset_id;
+  std::string startup_scene_asset_id;
   int window_width = 1280;
   int window_height = 720;
   cookie::renderer::ClearColor clear_color{};

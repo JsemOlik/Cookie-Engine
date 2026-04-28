@@ -4,6 +4,8 @@ add_library(cookie_assets STATIC
   src/AssetPackage.cpp
   src/AssetRegistry.cpp
   src/CookedAssetRegistry.cpp
+  src/MaterialAsset.cpp
+  src/SceneAsset.cpp
 )
 
 target_include_directories(cookie_assets
