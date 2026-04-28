@@ -8,6 +8,7 @@ endif()
 qt_standard_project_setup()
 
 qt_add_executable(CookieEditor
+  include/Cookie/Editor/EditorMainWindow.h
   src/main.cpp
   src/EditorMainWindow.cpp
 )
@@ -27,6 +28,10 @@ target_link_libraries(CookieEditor
 )
 
 target_compile_features(CookieEditor PRIVATE cxx_std_20)
+
+set_target_properties(CookieEditor PROPERTIES
+  AUTOMOC ON
+)
 
 if(WIN32)
   add_custom_command(TARGET CookieEditor POST_BUILD
