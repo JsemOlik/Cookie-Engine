@@ -1,11 +1,25 @@
 # Cookie Engine Checklist
 
-## Current Phase: Phase 24 - Static Cube Baseline
+## Current Phase: Phase 24 - Asset System v0 Contract + Thin Implementation
 
-Status: completed (pending local build verification)
+Status: in progress (design contract now)
+
+## Immediate Next (Phase 24)
+
+- [ ] Publish and keep `docs/asset-system-v0.md` as the authoritative v0 asset contract.
+- [ ] Add `AssetId`/GUID validation utilities and lifecycle handling (create, move/rename, duplicate, delete/recreate).
+- [ ] Add `.meta` v0 support in `engine/Assets` for: `guid/asset_id`, `type`, `importer` (versioned settings), `source_fingerprint`, `dependencies`, `labels`.
+- [ ] Replace remaining runtime path-authoritative asset references with `AssetId`-authoritative references.
+- [ ] Add first scene v0 asset path using `AssetId` references (nested scenes supported, component-based GameObjects, no prefabs).
+- [ ] Add cooked registry output for runtime (`AssetId -> cooked payload location/type/deps`) and load from `.pak` only.
+- [ ] Extend ship validation to fail when cooked registry or referenced cooked assets are missing.
 
 ## Completed
 
+- [x] Textured cube baseline works in runtime and shipped build with DX11 path.
+- [x] Asset-driven material bridge added (`demo_albedo_asset_id`) with fallback compatibility.
+- [x] Imported mesh rendering baseline wired with startup fallback to cube.
+- [x] Export pipeline now copies `content/` recursively and validates required nested assets.
 - [x] Analyzed the default CMake scaffold.
 - [x] Decided to replace the hello-world `Cookie-Engine/` target with a clean architecture.
 - [x] Added `PLAN.md`.

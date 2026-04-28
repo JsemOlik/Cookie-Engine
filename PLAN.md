@@ -301,6 +301,21 @@ Add indexed mesh support to renderer scene contracts and DX11 backend draw path,
 
 Milestone: runtime renders indexed/depth-tested geometry (generated cube or loaded test GLB) and remains open until user closes the window.
 
+### [ ] Phase 24: Asset System v0 Contract And Thin Vertical Slice
+
+Lock the first authoritative asset identity/reference contract for editor + runtime by adopting Unity-style sidecar `.meta` files (stable `AssetId` GUIDs, importer metadata, source fingerprints, and dependency tracking), then implement a thin runtime handoff that resolves assets through IDs rather than raw source paths.
+
+Milestone: `docs/asset-system-v0.md` is the project contract, first material/scene references are authored by `AssetId`, and shipped runtime can resolve startup scene/material dependencies through cooked registry data in `.pak` content.
+
+Thin implementation tasks for this phase:
+
+- Add `AssetId` format validation and lifecycle rules (create, move/rename, duplicate, delete/recreate).
+- Add v0 `.meta` schema reader/writer in `engine/Assets` (guid/type/importer version+settings/source fingerprint/dependencies/labels).
+- Introduce first material asset file that references textures by `AssetId` (not path authority).
+- Introduce scene v0 direction in data model: nested scenes by `AssetId`, GameObjects + components, no prefabs.
+- Add first cooked registry output mapping `AssetId -> cooked payload location/type/dependencies`.
+- Add ship/export validation for cooked registry presence and required referenced assets.
+
 ### [ ] Future Phases
 
 OpenGL, save support, mod support, in-game UI/HUD, advanced editor workflows, scripting, and platform expansion are future phases and should be planned separately before implementation.
