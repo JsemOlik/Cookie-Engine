@@ -16,7 +16,9 @@ class EditorMainWindow final : public QMainWindow {
   Q_OBJECT
 
  public:
-  explicit EditorMainWindow(QWidget* parent = nullptr);
+  explicit EditorMainWindow(
+      const std::filesystem::path& project_root_override = {},
+      QWidget* parent = nullptr);
 
  private:
   void RefreshAssets();

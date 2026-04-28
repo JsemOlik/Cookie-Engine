@@ -1,6 +1,7 @@
 #include "Cookie/Editor/EditorMainWindow.h"
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDockWidget>
 #include <QFormLayout>
 #include <QLabel>
@@ -58,10 +59,80 @@ QString BuildMetaSummary(const cookie::assets::DiscoveredAsset& asset) {
   return summary;
 }
 
+std::filesystem::path DetectProjectRoot(std::filesystem::path start) {
+  std::error_code error;
+  start = std::filesystem::absolute(start, error);
+  if (error) {
+    return std::filesystem::current_path();
+  }
+
+  auto candidate = start;
+  while (!candidate.empty()) {
+    if (std::filesystem::exists(candidate / "config" / "game.json") &&
+        std::filesystem::exists(candidate / "content")) {
+      return candidate;
+    }
+    const auto parent = candidate.parent_path();
+    if (parent == candidate) {
+      break;
+    }
+    candidate = parent;
+  }
+  return std::filesystem::current_path();
+}
+
+bool IsProjectRoot(const std::filesystem::path& candidate) {
+  return std::filesystem::exists(candidate / "config" / "game.json") &&
+         std::filesystem::exists(candidate / "content");
+}
+
+std::filesystem::path ResolveEditorProjectRoot(
+    const std::filesystem::path& project_root_override) {
+  if (!project_root_override.empty()) {
+    const auto detected = DetectProjectRoot(project_root_override);
+    if (IsProjectRoot(detected)) {
+      return detected;
+    }
+  }
+
+  const QString env_root_qt = qEnvironmentVariable("COOKIE_PROJECT_ROOT");
+  if (!env_root_qt.isEmpty()) {
+    const auto detected =
+        DetectProjectRoot(std::filesystem::path(env_root_qt.toStdString()));
+    if (IsProjectRoot(detected)) {
+      return detected;
+    }
+  }
+
+  const auto from_cwd = DetectProjectRoot(std::filesystem::current_path());
+  if (IsProjectRoot(from_cwd)) {
+    return from_cwd;
+  }
+
+  const auto app_dir = std::filesystem::path(
+      QCoreApplication::applicationDirPath().toStdString());
+  const auto from_app_dir = DetectProjectRoot(app_dir);
+  if (IsProjectRoot(from_app_dir)) {
+    return from_app_dir;
+  }
+
+#ifdef COOKIE_ENGINE_SOURCE_ROOT
+  const auto from_source_root =
+      DetectProjectRoot(std::filesystem::path(COOKIE_ENGINE_SOURCE_ROOT));
+  if (IsProjectRoot(from_source_root)) {
+    return from_source_root;
+  }
+#endif
+
+  return std::filesystem::current_path();
+}
+
 } // namespace
 
-EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
-  project_root_ = std::filesystem::current_path();
+EditorMainWindow::EditorMainWindow(
+    const std::filesystem::path& project_root_override, QWidget* parent)
+    : QMainWindow(parent) {
+  project_root_ = ResolveEditorProjectRoot(project_root_override);
   setWindowTitle("Cookie Editor");
   resize(1600, 900);
 
@@ -179,10 +250,14 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* file_menu = menuBar()->addMenu("&File");
   file_menu->addAction("E&xit", this, &QWidget::close);
 
+  const auto cooked_registry_path = project_root_ / "content" / "cooked_assets.pakreg";
+  asset_registry_.LoadCookedRegistry(cooked_registry_path);
   RefreshAssets();
   RefreshStartupSceneSelector();
   RefreshSceneOutliner();
-  statusBar()->showMessage("Cookie Editor Phase 24B shell loaded");
+  statusBar()->showMessage(
+      "Cookie Editor Phase 24B shell loaded (project root: " +
+      QString::fromStdString(project_root_.string()) + ")");
 }
 
 void EditorMainWindow::RefreshAssets() {

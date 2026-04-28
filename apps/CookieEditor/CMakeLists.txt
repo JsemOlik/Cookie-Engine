@@ -28,6 +28,11 @@ target_link_libraries(CookieEditor
 )
 
 target_compile_features(CookieEditor PRIVATE cxx_std_20)
+file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}" COOKIE_ENGINE_SOURCE_ROOT_PATH)
+target_compile_definitions(CookieEditor
+  PRIVATE
+    COOKIE_ENGINE_SOURCE_ROOT="${COOKIE_ENGINE_SOURCE_ROOT_PATH}"
+)
 
 set_target_properties(CookieEditor PROPERTIES
   AUTOMOC ON
