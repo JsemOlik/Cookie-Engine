@@ -39,6 +39,14 @@ set_target_properties(CookieEditor PROPERTIES
 )
 
 if(WIN32)
+  add_custom_command(TARGET CookieEditor PRE_LINK
+    COMMAND "${CMAKE_COMMAND}"
+            -DCOOKIE_EDITOR_TARGET="$<TARGET_FILE:CookieEditor>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/TerminateRunningEditor.cmake"
+    COMMENT "Ensuring stale CookieEditor process is not locking target executable"
+    VERBATIM
+  )
+
   add_custom_command(TARGET CookieEditor POST_BUILD
     COMMAND "$<TARGET_FILE:Qt6::windeployqt>"
             "$<TARGET_FILE:CookieEditor>"
