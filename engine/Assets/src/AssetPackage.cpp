@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -161,8 +162,12 @@ bool PakArchive::ReadEntry(std::string_view entry_name,
   if (!out_bytes.empty()) {
     file.read(reinterpret_cast<char*>(out_bytes.data()),
               static_cast<std::streamsize>(out_bytes.size()));
+    if (file.gcount() != static_cast<std::streamsize>(out_bytes.size())) {
+      out_bytes.clear();
+      return false;
+    }
   }
-  return file.good() || file.eof();
+  return true;
 }
 
 bool PakArchive::ReadEntryToFile(std::string_view entry_name,
@@ -233,19 +238,13 @@ bool WritePakArchive(const std::filesystem::path& pak_path,
         }
         return false;
       }
-      source.seekg(0, std::ios::end);
-      const auto end_pos = source.tellg();
-      source.seekg(0, std::ios::beg);
-      if (end_pos > 0) {
-        bytes.resize(static_cast<std::size_t>(end_pos));
-        source.read(reinterpret_cast<char*>(bytes.data()),
-                    static_cast<std::streamsize>(bytes.size()));
-        if (!source.good() && !source.eof()) {
-          if (error_message != nullptr) {
-            *error_message = "Failed reading source payload: " + entry.source_path.string();
-          }
-          return false;
+      bytes.assign(std::istreambuf_iterator<char>(source),
+                   std::istreambuf_iterator<char>());
+      if (!source.eof() && source.fail()) {
+        if (error_message != nullptr) {
+          *error_message = "Failed reading source payload: " + entry.source_path.string();
         }
+        return false;
       }
     } else {
       bytes = entry.inline_bytes;

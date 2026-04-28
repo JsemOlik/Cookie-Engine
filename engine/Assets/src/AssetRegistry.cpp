@@ -35,6 +35,16 @@ std::string NormalizeCacheKey(std::string value) {
   return value;
 }
 
+std::filesystem::file_time_type SafeLastWriteTime(
+    const std::filesystem::path& path) {
+  std::error_code error;
+  const auto value = std::filesystem::last_write_time(path, error);
+  if (error) {
+    return std::filesystem::file_time_type::min();
+  }
+  return value;
+}
+
 }  // namespace
 
 bool AssetRegistry::MountPackage(const std::filesystem::path& pak_path) {
@@ -169,14 +179,18 @@ std::filesystem::path AssetRegistry::ResolveCookedAssetPath(
 
   const std::string archive_relative(descriptor.substr(6, hash_index - 6));
   const std::string entry_name(descriptor.substr(hash_index + 1));
+  const std::filesystem::path archive_path =
+      cooked_registry_path_.parent_path() / archive_relative;
+  const auto archive_write_time = SafeLastWriteTime(archive_path);
   const auto cache_iter = extracted_cache_paths_.find(record.asset_id);
   if (cache_iter != extracted_cache_paths_.end() &&
       std::filesystem::exists(cache_iter->second)) {
-    return cache_iter->second;
+    const auto cache_write_time = SafeLastWriteTime(cache_iter->second);
+    if (cache_write_time >= archive_write_time) {
+      return cache_iter->second;
+    }
   }
 
-  const std::filesystem::path archive_path =
-      cooked_registry_path_.parent_path() / archive_relative;
   PakArchive archive;
   if (!archive.Open(archive_path)) {
     return {};
@@ -186,8 +200,11 @@ std::filesystem::path AssetRegistry::ResolveCookedAssetPath(
       cooked_registry_path_.parent_path() / ".asset_cache";
   const std::filesystem::path extension =
       std::filesystem::path(entry_name).extension();
+  const std::string archive_fragment =
+      NormalizeCacheKey(std::filesystem::path(archive_relative).stem().string());
   const std::filesystem::path extracted_path =
-      cache_root / (NormalizeCacheKey(record.asset_id) + extension.string());
+      cache_root /
+      (archive_fragment + "_" + NormalizeCacheKey(record.asset_id) + extension.string());
   if (!archive.ReadEntryToFile(entry_name, extracted_path)) {
     return {};
   }
