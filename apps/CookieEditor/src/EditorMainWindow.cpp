@@ -11,7 +11,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QTreeWidgetItemIterator>
 #include <QMenuBar>
+#include <QMap>
 #include <QMessageBox>
 #include <QEvent>
 #include <QKeyEvent>
@@ -288,7 +292,9 @@ EditorMainWindow::EditorMainWindow(
   viewport_camera_pitch_radians_ = std::asin(initial_forward.y);
   viewport_last_frame_time_ = std::chrono::steady_clock::now();
 
-  assets_list_ = new QListWidget(this);
+  assets_tree_ = new QTreeWidget(this);
+  assets_tree_->setColumnCount(1);
+  assets_tree_->setHeaderHidden(true);
   scene_outliner_list_ = new QListWidget(this);
   meta_inspector_ = new QTextEdit(this);
   meta_inspector_->setReadOnly(true);
@@ -309,8 +315,8 @@ EditorMainWindow::EditorMainWindow(
   scale_x_input_ = new QLineEdit(this);
   scale_y_input_ = new QLineEdit(this);
   scale_z_input_ = new QLineEdit(this);
-  mesh_asset_id_input_ = new QLineEdit(this);
-  material_asset_id_input_ = new QLineEdit(this);
+  mesh_asset_picker_ = new QComboBox(this);
+  material_asset_picker_ = new QComboBox(this);
   rigidbody_type_input_ = new QLineEdit(this);
   rigidbody_mass_input_ = new QLineEdit(this);
   apply_object_button_ = new QPushButton("Apply Object", this);
@@ -319,12 +325,22 @@ EditorMainWindow::EditorMainWindow(
   mesh_renderer_status_label_ = new QLabel("MeshRenderer: not added", this);
   rigidbody_status_label_ = new QLabel("RigidBody: not added", this);
 
-  connect(assets_list_, &QListWidget::currentRowChanged, this,
-          [this](const int index) { UpdateMetaInspector(index); });
-  connect(scene_outliner_list_, &QListWidget::currentRowChanged, this,
-          [this](const int) { RefreshInspector(); });
+  connect(assets_tree_, &QTreeWidget::currentItemChanged, this,
+          [this](QTreeWidgetItem* current, QTreeWidgetItem*) {
+            UpdateMetaInspector(ResolveAssetBrowserIndex(current));
+          });
+  connect(scene_outliner_list_, &QListWidget::currentItemChanged, this,
+          [this](QListWidgetItem* current, QListWidgetItem* previous) {
+            if (previous != nullptr) {
+              const int previous_index = scene_outliner_list_->row(previous);
+              ApplyInspectorToObjectIndex(previous_index, false);
+            }
+            (void)current;
+            RefreshInspector();
+          });
   connect(startup_scene_selector_, &QComboBox::currentTextChanged, this,
           [this](const QString& text) {
+            ApplyInspectorToSelectedObject();
             const QString selected_asset_id = text.section(' ', 0, 0);
             if (selected_asset_id.isEmpty()) {
               return;
@@ -346,6 +362,26 @@ EditorMainWindow::EditorMainWindow(
           [this]() { AddComponentToSelectedObject(); });
   connect(remove_component_button_, &QPushButton::clicked, this,
           [this]() { RemoveComponentFromSelectedObject(); });
+  auto connect_auto_apply_line_edit = [this](QLineEdit* input) {
+    connect(input, &QLineEdit::editingFinished, this,
+            [this]() { ApplyInspectorToSelectedObject(); });
+  };
+  connect_auto_apply_line_edit(object_name_input_);
+  connect_auto_apply_line_edit(pos_x_input_);
+  connect_auto_apply_line_edit(pos_y_input_);
+  connect_auto_apply_line_edit(pos_z_input_);
+  connect_auto_apply_line_edit(rot_x_input_);
+  connect_auto_apply_line_edit(rot_y_input_);
+  connect_auto_apply_line_edit(rot_z_input_);
+  connect_auto_apply_line_edit(scale_x_input_);
+  connect_auto_apply_line_edit(scale_y_input_);
+  connect_auto_apply_line_edit(scale_z_input_);
+  connect_auto_apply_line_edit(rigidbody_type_input_);
+  connect_auto_apply_line_edit(rigidbody_mass_input_);
+  connect(mesh_asset_picker_, &QComboBox::currentTextChanged, this,
+          [this](const QString&) { ApplyInspectorToSelectedObject(); });
+  connect(material_asset_picker_, &QComboBox::currentTextChanged, this,
+          [this](const QString&) { ApplyInspectorToSelectedObject(); });
 
   auto* build_panel = new QWidget(this);
   auto* build_layout = new QVBoxLayout(build_panel);
@@ -534,8 +570,8 @@ EditorMainWindow::EditorMainWindow(
 
   mesh_renderer_group_ = new QGroupBox("MeshRenderer", inspector_panel);
   auto* mesh_layout = new QFormLayout(mesh_renderer_group_);
-  mesh_layout->addRow("Mesh AssetId", mesh_asset_id_input_);
-  mesh_layout->addRow("Material AssetId", material_asset_id_input_);
+  mesh_layout->addRow("Mesh Asset", mesh_asset_picker_);
+  mesh_layout->addRow("Material Asset", material_asset_picker_);
 
   rigidbody_group_ = new QGroupBox("RigidBody", inspector_panel);
   auto* rigid_layout = new QFormLayout(rigidbody_group_);
@@ -546,7 +582,6 @@ EditorMainWindow::EditorMainWindow(
   inspector_layout->addWidget(mesh_renderer_group_);
   inspector_layout->addWidget(rigidbody_status_label_);
   inspector_layout->addWidget(rigidbody_group_);
-  inspector_layout->addWidget(apply_object_button_);
 
   addDockWidget(Qt::LeftDockWidgetArea,
                 CreateDock(
@@ -557,7 +592,7 @@ EditorMainWindow::EditorMainWindow(
   addDockWidget(Qt::RightDockWidgetArea,
                 CreateDock("Object Inspector", inspector_panel, this));
   addDockWidget(Qt::BottomDockWidgetArea,
-                CreateDock("Assets", assets_list_, this));
+                CreateDock("Assets", assets_tree_, this));
   addDockWidget(Qt::BottomDockWidgetArea,
                 CreateDock("Build/Export", build_panel, this));
   addDockWidget(Qt::LeftDockWidgetArea,
@@ -587,21 +622,15 @@ EditorMainWindow::EditorMainWindow(
 }
 
 void EditorMainWindow::RefreshAssets() {
-  assets_list_->clear();
+  assets_tree_->clear();
   discovered_assets_.clear();
 
   asset_registry_.DiscoverProjectAssets(project_root_);
   discovered_assets_ = asset_registry_.GetDiscoveredAssets();
-  for (const auto& asset : discovered_assets_) {
-    const QString label =
-        QString::fromStdString(asset.source_relative_path) + " [" +
-        QString::fromStdString(asset.meta.asset_id) + "]";
-    assets_list_->addItem(label);
-  }
+  RebuildAssetBrowserTree();
+  RebuildMeshRendererAssetPickers();
 
-  if (!discovered_assets_.empty()) {
-    assets_list_->setCurrentRow(0);
-  } else {
+  if (discovered_assets_.empty()) {
     meta_inspector_->setPlainText(
         "No .meta-backed assets found under project Assets/ or content/.");
   }
@@ -619,6 +648,86 @@ void EditorMainWindow::UpdateMetaInspector(const int index) {
   }
 
   meta_inspector_->setPlainText(BuildMetaSummary(discovered_assets_[index]));
+}
+
+int EditorMainWindow::ResolveAssetBrowserIndex(QTreeWidgetItem* item) const {
+  if (item == nullptr) {
+    return -1;
+  }
+  bool ok = false;
+  const int index = item->data(0, Qt::UserRole).toInt(&ok);
+  if (!ok) {
+    return -1;
+  }
+  if (index < 0 || static_cast<std::size_t>(index) >= discovered_assets_.size()) {
+    return -1;
+  }
+  return index;
+}
+
+void EditorMainWindow::RebuildAssetBrowserTree() {
+  assets_tree_->clear();
+
+  QMap<QString, QTreeWidgetItem*> folder_nodes;
+  auto ensure_folder_path = [&](const QString& folder_path) -> QTreeWidgetItem* {
+    if (folder_path.isEmpty()) {
+      return nullptr;
+    }
+    if (folder_nodes.contains(folder_path)) {
+      return folder_nodes[folder_path];
+    }
+
+    const int sep = folder_path.lastIndexOf('/');
+    QTreeWidgetItem* parent = nullptr;
+    if (sep > 0) {
+      parent = ensure_folder_path(folder_path.left(sep));
+    }
+    auto* node = new QTreeWidgetItem();
+    node->setText(0, folder_path.mid(sep + 1));
+    node->setData(0, Qt::UserRole, -1);
+    if (parent != nullptr) {
+      parent->addChild(node);
+    } else {
+      assets_tree_->addTopLevelItem(node);
+    }
+    folder_nodes.insert(folder_path, node);
+    return node;
+  };
+
+  for (std::size_t i = 0; i < discovered_assets_.size(); ++i) {
+    const auto& asset = discovered_assets_[i];
+    QString rel = QString::fromStdString(asset.source_relative_path);
+    rel.replace('\\', '/');
+    const int sep = rel.lastIndexOf('/');
+    QTreeWidgetItem* parent = nullptr;
+    if (sep > 0) {
+      parent = ensure_folder_path(rel.left(sep));
+    }
+
+    auto* file_item = new QTreeWidgetItem();
+    file_item->setText(0, rel.mid(sep + 1));
+    file_item->setData(0, Qt::UserRole, static_cast<int>(i));
+    file_item->setToolTip(
+        0, rel + "\nAssetId: " + QString::fromStdString(asset.meta.asset_id));
+    if (parent != nullptr) {
+      parent->addChild(file_item);
+    } else {
+      assets_tree_->addTopLevelItem(file_item);
+    }
+  }
+
+  assets_tree_->expandToDepth(1);
+  if (!discovered_assets_.empty()) {
+    QTreeWidgetItemIterator it(assets_tree_);
+    while (*it != nullptr) {
+      const int idx = ResolveAssetBrowserIndex(*it);
+      if (idx >= 0) {
+        assets_tree_->setCurrentItem(*it);
+        break;
+      }
+      ++it;
+    }
+  }
 }
 
 void EditorMainWindow::RefreshStartupSceneSelector() {
@@ -699,6 +808,7 @@ void EditorMainWindow::LoadActiveScene() {
 }
 
 void EditorMainWindow::RefreshInspector() {
+  inspector_updating_ = true;
   const int index = CurrentSceneObjectIndex();
   if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
     object_name_input_->setText("");
@@ -711,14 +821,15 @@ void EditorMainWindow::RefreshInspector() {
     scale_x_input_->setText("");
     scale_y_input_->setText("");
     scale_z_input_->setText("");
-    mesh_asset_id_input_->setText("");
-    material_asset_id_input_->setText("");
+    mesh_asset_picker_->setCurrentIndex(-1);
+    material_asset_picker_->setCurrentIndex(-1);
     rigidbody_type_input_->setText("");
     rigidbody_mass_input_->setText("");
     mesh_renderer_status_label_->setText("MeshRenderer: not added");
     rigidbody_status_label_->setText("RigidBody: not added");
     mesh_renderer_group_->setVisible(false);
     rigidbody_group_->setVisible(false);
+    inspector_updating_ = false;
     return;
   }
 
@@ -737,15 +848,17 @@ void EditorMainWindow::RefreshInspector() {
   if (object.has_mesh_renderer) {
     mesh_renderer_group_->setVisible(true);
     mesh_renderer_status_label_->setText("MeshRenderer: added");
-    mesh_asset_id_input_->setText(
+    int mesh_index = mesh_asset_picker_->findData(
         QString::fromStdString(object.mesh_renderer.mesh_asset_id));
-    material_asset_id_input_->setText(
+    int material_index = material_asset_picker_->findData(
         QString::fromStdString(object.mesh_renderer.material_asset_id));
+    mesh_asset_picker_->setCurrentIndex(mesh_index);
+    material_asset_picker_->setCurrentIndex(material_index);
   } else {
     mesh_renderer_group_->setVisible(false);
     mesh_renderer_status_label_->setText("MeshRenderer: not added");
-    mesh_asset_id_input_->setText("");
-    material_asset_id_input_->setText("");
+    mesh_asset_picker_->setCurrentIndex(-1);
+    material_asset_picker_->setCurrentIndex(-1);
   }
 
   if (object.has_rigidbody) {
@@ -759,10 +872,13 @@ void EditorMainWindow::RefreshInspector() {
     rigidbody_type_input_->setText("");
     rigidbody_mass_input_->setText("");
   }
+  inspector_updating_ = false;
 }
 
-void EditorMainWindow::ApplyInspectorToSelectedObject() {
-  const int index = CurrentSceneObjectIndex();
+void EditorMainWindow::ApplyInspectorToObjectIndex(int index, bool show_status) {
+  if (inspector_updating_) {
+    return;
+  }
   if (index < 0 || static_cast<std::size_t>(index) >= active_scene_.objects.size()) {
     return;
   }
@@ -785,9 +901,9 @@ void EditorMainWindow::ApplyInspectorToSelectedObject() {
 
   if (object.has_mesh_renderer) {
     object.mesh_renderer.mesh_asset_id =
-        mesh_asset_id_input_->text().trimmed().toStdString();
+        mesh_asset_picker_->currentData().toString().trimmed().toStdString();
     object.mesh_renderer.material_asset_id =
-        material_asset_id_input_->text().trimmed().toStdString();
+        material_asset_picker_->currentData().toString().trimmed().toStdString();
   }
 
   if (object.has_rigidbody) {
@@ -801,7 +917,55 @@ void EditorMainWindow::ApplyInspectorToSelectedObject() {
   RefreshSceneOutliner();
   scene_outliner_list_->setCurrentRow(index);
   RebuildViewportSceneCache();
-  statusBar()->showMessage("Applied object edits.");
+  if (show_status) {
+    statusBar()->showMessage("Applied object edits.");
+  }
+}
+
+void EditorMainWindow::ApplyInspectorToSelectedObject() {
+  ApplyInspectorToObjectIndex(CurrentSceneObjectIndex(), true);
+}
+
+void EditorMainWindow::RebuildMeshRendererAssetPickers() {
+  const int current_object_index = CurrentSceneObjectIndex();
+  std::string mesh_selected_id;
+  std::string material_selected_id;
+  if (current_object_index >= 0 &&
+      static_cast<std::size_t>(current_object_index) < active_scene_.objects.size()) {
+    const auto& object = active_scene_.objects[static_cast<std::size_t>(current_object_index)];
+    mesh_selected_id = object.mesh_renderer.mesh_asset_id;
+    material_selected_id = object.mesh_renderer.material_asset_id;
+  }
+
+  inspector_updating_ = true;
+  mesh_asset_picker_->clear();
+  material_asset_picker_->clear();
+  mesh_asset_picker_->addItem("(None)", QString{});
+  material_asset_picker_->addItem("(None)", QString{});
+
+  for (const auto& asset : discovered_assets_) {
+    const QString display = QString::fromStdString(asset.source_relative_path);
+    const QString asset_id = QString::fromStdString(asset.meta.asset_id);
+    if (IsTypeOneOf(asset.meta.type, {"Mesh", "Model"})) {
+      mesh_asset_picker_->addItem(display, asset_id);
+    }
+    if (IsTypeOneOf(asset.meta.type, {"Material", "MaterialAsset"})) {
+      material_asset_picker_->addItem(display, asset_id);
+    }
+  }
+
+  int mesh_index = mesh_asset_picker_->findData(QString::fromStdString(mesh_selected_id));
+  int material_index =
+      material_asset_picker_->findData(QString::fromStdString(material_selected_id));
+  if (mesh_index < 0) {
+    mesh_index = 0;
+  }
+  if (material_index < 0) {
+    material_index = 0;
+  }
+  mesh_asset_picker_->setCurrentIndex(mesh_index);
+  material_asset_picker_->setCurrentIndex(material_index);
+  inspector_updating_ = false;
 }
 
 void EditorMainWindow::AddComponentToSelectedObject() {

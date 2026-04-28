@@ -13,6 +13,8 @@
 #include "Cookie/Renderer/RendererBackend.h"
 
 class QListWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QLineEdit;
 class QTextEdit;
 class QComboBox;
@@ -39,6 +41,10 @@ class EditorMainWindow final : public QMainWindow {
   void LoadActiveScene();
   void RefreshInspector();
   void SaveActiveScene();
+  void RebuildAssetBrowserTree();
+  void RebuildMeshRendererAssetPickers();
+  void ApplyInspectorToObjectIndex(int index, bool show_status);
+  int ResolveAssetBrowserIndex(QTreeWidgetItem* item) const;
   void ApplyInspectorToSelectedObject();
   int CurrentSceneObjectIndex() const;
   void AddComponentToSelectedObject();
@@ -55,7 +61,7 @@ class EditorMainWindow final : public QMainWindow {
   std::vector<cookie::assets::DiscoveredAsset> discovered_assets_;
   cookie::assets::SceneAsset active_scene_;
   std::filesystem::path active_scene_path_;
-  QListWidget* assets_list_ = nullptr;
+  QTreeWidget* assets_tree_ = nullptr;
   QListWidget* scene_outliner_list_ = nullptr;
   QTextEdit* meta_inspector_ = nullptr;
   QComboBox* startup_scene_selector_ = nullptr;
@@ -76,8 +82,8 @@ class EditorMainWindow final : public QMainWindow {
   QLabel* rigidbody_status_label_ = nullptr;
   QGroupBox* mesh_renderer_group_ = nullptr;
   QGroupBox* rigidbody_group_ = nullptr;
-  QLineEdit* mesh_asset_id_input_ = nullptr;
-  QLineEdit* material_asset_id_input_ = nullptr;
+  QComboBox* mesh_asset_picker_ = nullptr;
+  QComboBox* material_asset_picker_ = nullptr;
   QLineEdit* rigidbody_type_input_ = nullptr;
   QLineEdit* rigidbody_mass_input_ = nullptr;
   QPushButton* apply_object_button_ = nullptr;
@@ -94,6 +100,7 @@ class EditorMainWindow final : public QMainWindow {
   std::vector<cookie::renderer::ImportedPrimitive> viewport_mesh_cache_;
   std::vector<std::string> viewport_mesh_textures_;
   std::vector<cookie::renderer::Float4x4> viewport_mesh_transforms_;
+  bool inspector_updating_ = false;
 
   float viewport_camera_position_[3] = {4.0f, 3.0f, -7.0f};
   float viewport_camera_yaw_radians_ = 0.0f;
