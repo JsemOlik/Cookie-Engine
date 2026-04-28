@@ -89,13 +89,38 @@ if not exist "%EXPORT_ROOT%\content\cooked_assets.pakreg" (
   set "EXIT_CODE=1"
   goto :end
 )
-if not exist "%EXPORT_ROOT%\content\textures\debug.png" (
-  echo [ERROR] Missing texture asset: content\textures\debug.png
+if not exist "%EXPORT_ROOT%\content\textures.pak" (
+  echo [ERROR] Missing package manifest: content\textures.pak
   set "EXIT_CODE=1"
   goto :end
 )
-if not exist "%EXPORT_ROOT%\content\models\test_mesh.glb" (
-  echo [ERROR] Missing mesh asset: content\models\test_mesh.glb
+if not exist "%EXPORT_ROOT%\content\models.pak" (
+  echo [ERROR] Missing package manifest: content\models.pak
+  set "EXIT_CODE=1"
+  goto :end
+)
+if not exist "%EXPORT_ROOT%\content\materials.pak" (
+  echo [ERROR] Missing package manifest: content\materials.pak
+  set "EXIT_CODE=1"
+  goto :end
+)
+if not exist "%EXPORT_ROOT%\content\scenes.pak" (
+  echo [ERROR] Missing package manifest: content\scenes.pak
+  set "EXIT_CODE=1"
+  goto :end
+)
+if not exist "%EXPORT_ROOT%\content\cooked" (
+  echo [ERROR] Missing cooked payload directory: content\cooked
+  set "EXIT_CODE=1"
+  goto :end
+)
+dir /b /s "%EXPORT_ROOT%\content\*.meta" >nul 2>nul && (
+  echo [ERROR] Raw editable .meta files found in shipped content.
+  set "EXIT_CODE=1"
+  goto :end
+)
+dir /b /s "%EXPORT_ROOT%\content\*.cookieasset" >nul 2>nul && (
+  echo [ERROR] Raw editable .cookieasset files found in shipped content.
   set "EXIT_CODE=1"
   goto :end
 )

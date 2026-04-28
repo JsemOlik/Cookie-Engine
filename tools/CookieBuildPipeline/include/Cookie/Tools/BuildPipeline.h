@@ -33,8 +33,8 @@ struct BuildCookPackageOptions {
 BuildProfile ParseBuildProfile(const std::string& value);
 const char* ToString(BuildProfile profile);
 
-// Future editor path should call this API directly. For now, this produces
-// the current export structure and keeps existing script behavior intact.
+// Future editor path should call this API directly. This produces the shipped
+// runtime layout with cooked payloads + package manifests (no raw .meta/.cookieasset).
 ExportResult BuildCookPackage(const BuildCookPackageOptions& options);
 
 }  // namespace cookie::tools

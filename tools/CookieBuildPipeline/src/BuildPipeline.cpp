@@ -9,6 +9,8 @@
 #include <cctype>
 #include <exception>
 #include <fstream>
+#include <map>
+#include <set>
 #include <system_error>
 
 namespace fs = std::filesystem;
@@ -216,6 +218,7 @@ void BuildCookedRegistryArtifact(
     ExportResult& result) {
   cookie::assets::CookedAssetRegistry registry;
   const fs::path content_root = project_root / "content";
+  const fs::path cooked_root = export_content_dir / "cooked";
 
   if (!fs::exists(content_root)) {
     AddWarning(result, "Cannot build cooked registry; missing content directory.");
@@ -223,6 +226,31 @@ void BuildCookedRegistryArtifact(
   }
 
   std::error_code error;
+  fs::create_directories(cooked_root, error);
+  if (error) {
+    AddWarning(
+        result,
+        "Failed to create cooked content directory: " + cooked_root.string());
+    return;
+  }
+
+  std::map<std::string, std::set<std::string>> package_to_asset_ids;
+  auto package_for_type = [](std::string_view type) -> std::string {
+    if (type == "Texture" || type == "Texture2D") {
+      return "textures.pak";
+    }
+    if (type == "Mesh" || type == "Model") {
+      return "models.pak";
+    }
+    if (type == "Material" || type == "MaterialAsset") {
+      return "materials.pak";
+    }
+    if (type == "Scene" || type == "SceneAsset") {
+      return "scenes.pak";
+    }
+    return "misc.pak";
+  };
+
   for (const auto& entry : fs::recursive_directory_iterator(content_root, error)) {
     if (error || !entry.is_regular_file()) {
       continue;
@@ -244,20 +272,13 @@ void BuildCookedRegistryArtifact(
 
     const fs::path source_path =
         meta_path.parent_path() / meta_filename.substr(0, meta_filename.size() - 5);
-    const fs::path relative_content_path =
-        fs::relative(source_path, content_root, error);
-    if (error) {
-      AddWarning(
-          result,
-          "Failed to compute content relative path for: " + source_path.string());
-      error.clear();
-      continue;
-    }
-
     cookie::assets::CookedAssetRecord record{};
     record.asset_id = meta.asset_id;
     record.type = meta.type;
-    record.runtime_relative_path = relative_content_path.string();
+    record.runtime_relative_path =
+        (fs::path("cooked") /
+         (meta.asset_id + source_path.extension().string()))
+            .string();
     record.source_relative_path =
         fs::relative(source_path, project_root, error).string();
     if (error) {
@@ -292,12 +313,62 @@ void BuildCookedRegistryArtifact(
         }
       }
     }
+    const std::string runtime_relative_path = record.runtime_relative_path;
     registry.AddOrReplace(std::move(record));
+
+    const fs::path cooked_destination =
+        export_content_dir / runtime_relative_path;
+    fs::create_directories(cooked_destination.parent_path(), error);
+    if (error) {
+      AddWarning(
+          result,
+          "Failed to create cooked parent directory: " +
+              cooked_destination.parent_path().string());
+      error.clear();
+      continue;
+    }
+
+    fs::copy_file(
+        source_path, cooked_destination, fs::copy_options::overwrite_existing, error);
+    if (error) {
+      AddWarning(
+          result,
+          "Failed to copy cooked payload: " + source_path.string() + " -> " +
+              cooked_destination.string());
+      error.clear();
+      continue;
+    }
+
+    package_to_asset_ids[package_for_type(meta.type)].insert(meta.asset_id);
   }
 
   const fs::path registry_path = export_content_dir / "cooked_assets.pakreg";
   if (!registry.SaveToFile(registry_path)) {
     AddWarning(result, "Failed to write cooked registry: " + registry_path.string());
+  }
+
+  for (const auto& pair : package_to_asset_ids) {
+    const fs::path pak_path = export_content_dir / pair.first;
+    std::ofstream pak_file(pak_path, std::ios::trunc);
+    if (!pak_file.is_open()) {
+      AddWarning(result, "Failed to write package manifest: " + pak_path.string());
+      continue;
+    }
+    pak_file << "# Cookie Engine asset package manifest\n";
+    for (const auto& asset_id : pair.second) {
+      pak_file << asset_id << '\n';
+    }
+  }
+
+  const fs::path base_pak_path = export_content_dir / "base.pak";
+  std::ofstream base_pak(base_pak_path, std::ios::trunc);
+  if (!base_pak.is_open()) {
+    AddWarning(result, "Failed to write base package manifest: " + base_pak_path.string());
+    return;
+  }
+  base_pak << "# Cookie Engine base asset package\n";
+  for (const auto& record : registry.Entries()) {
+    base_pak << record.asset_id << '\n';
   }
 }
 
@@ -357,7 +428,6 @@ ExportResult BuildCookPackage(const BuildCookPackageOptions& options) {
     WarnIfMissing(runtime_build_dir / "bin" / "Physics.dll", result, "Expected physics module");
     WarnIfMissing(runtime_build_dir / "bin" / "Audio.dll", result, "Expected audio module");
 
-    CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);
     BuildCookedRegistryArtifact(project_root, export_content, result);
     ApplyEngineProfile(project_root / "config", export_config, options.profile, result);
