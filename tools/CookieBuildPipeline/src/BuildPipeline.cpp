@@ -1,5 +1,8 @@
 #include "Cookie/Tools/BuildPipeline.h"
 
+#include "Cookie/Assets/AssetMeta.h"
+#include "Cookie/Assets/CookedAssetRegistry.h"
+
 #include <algorithm>
 #include <cctype>
 #include <exception>
@@ -206,6 +209,69 @@ void WriteExportReport(
   }
 }
 
+void BuildCookedRegistryArtifact(
+    const fs::path& project_root, const fs::path& export_content_dir,
+    ExportResult& result) {
+  cookie::assets::CookedAssetRegistry registry;
+  const fs::path content_root = project_root / "content";
+
+  if (!fs::exists(content_root)) {
+    AddWarning(result, "Cannot build cooked registry; missing content directory.");
+    return;
+  }
+
+  std::error_code error;
+  for (const auto& entry : fs::recursive_directory_iterator(content_root, error)) {
+    if (error || !entry.is_regular_file()) {
+      continue;
+    }
+
+    const fs::path meta_path = entry.path();
+    const std::string meta_filename = meta_path.filename().string();
+    if (meta_filename.size() <= 5 ||
+        meta_filename.substr(meta_filename.size() - 5) != ".meta") {
+      continue;
+    }
+
+    cookie::assets::AssetMeta meta;
+    std::string parse_error;
+    if (!cookie::assets::LoadAssetMeta(meta_path, meta, &parse_error)) {
+      AddWarning(result, parse_error);
+      continue;
+    }
+
+    const fs::path source_path =
+        meta_path.parent_path() / meta_filename.substr(0, meta_filename.size() - 5);
+    const fs::path relative_content_path =
+        fs::relative(source_path, content_root, error);
+    if (error) {
+      AddWarning(
+          result,
+          "Failed to compute content relative path for: " + source_path.string());
+      error.clear();
+      continue;
+    }
+
+    cookie::assets::CookedAssetRecord record{};
+    record.asset_id = meta.asset_id;
+    record.type = meta.type;
+    record.runtime_relative_path = relative_content_path.string();
+    record.source_relative_path =
+        fs::relative(source_path, project_root, error).string();
+    if (error) {
+      record.source_relative_path = source_path.string();
+      error.clear();
+    }
+    record.dependencies = meta.dependencies;
+    registry.AddOrReplace(std::move(record));
+  }
+
+  const fs::path registry_path = export_content_dir / "cooked_assets.pakreg";
+  if (!registry.SaveToFile(registry_path)) {
+    AddWarning(result, "Failed to write cooked registry: " + registry_path.string());
+  }
+}
+
 }  // namespace
 
 BuildProfile ParseBuildProfile(const std::string& value) {
@@ -264,6 +330,7 @@ ExportResult BuildCookPackage(const BuildCookPackageOptions& options) {
 
     CopyDirectoryContents(project_root / "content", export_content, result);
     CopyDirectoryContents(project_root / "config", export_config, result);
+    BuildCookedRegistryArtifact(project_root, export_content, result);
     ApplyEngineProfile(project_root / "config", export_config, options.profile, result);
     RemoveProfileConfigsFromExport(export_config, result);
 

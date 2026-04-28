@@ -23,6 +23,7 @@ target_link_libraries(CookieEditor
     cookie_core
     cookie_renderer
     cookie_assets
+    cookie_tools_pipeline
 )
 
 target_compile_features(CookieEditor PRIVATE cxx_std_20)

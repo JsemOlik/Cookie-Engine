@@ -163,6 +163,13 @@ int Application::Run() const {
   }
 
   cookie::assets::AssetRegistry assets;
+  const auto cooked_registry = paths.project_root / "content" / "cooked_assets.pakreg";
+  if (assets.LoadCookedRegistry(cooked_registry)) {
+    logger.Info("Loaded cooked asset registry: " + cooked_registry.string());
+  } else {
+    logger.Info("Cooked asset registry not found or unreadable: " +
+                cooked_registry.string());
+  }
   const auto base_package = paths.project_root / "content" / "base.pak";
   if (assets.MountPackage(base_package)) {
     logger.Info("Mounted asset package: " + base_package.string());
@@ -245,23 +252,32 @@ int Application::Run() const {
   int frame_count = 0;
   const auto frame_start_time = std::chrono::steady_clock::now();
   auto last_frame_time = frame_start_time;
-  std::filesystem::path resolved_demo_albedo_texture_path =
-      assets.ResolveAssetPath(config_.demo_albedo_asset_id);
-  if (resolved_demo_albedo_texture_path.empty()) {
-    // Backward-compatible fallback for direct path config values.
-    resolved_demo_albedo_texture_path = config_.demo_albedo_asset_id;
-    if (!resolved_demo_albedo_texture_path.empty() &&
-        resolved_demo_albedo_texture_path.is_relative()) {
-      resolved_demo_albedo_texture_path =
-          paths.project_root / resolved_demo_albedo_texture_path;
-    }
-    logger.Info("Demo albedo asset id not found in mounted packages, "
-                "falling back to path: " +
-                resolved_demo_albedo_texture_path.string());
-  } else {
-    logger.Info("Resolved demo albedo asset id '" +
+  std::filesystem::path resolved_demo_albedo_texture_path;
+  if (const auto cooked_record =
+          assets.ResolveCookedRecord(config_.demo_albedo_asset_id)) {
+    resolved_demo_albedo_texture_path =
+        paths.project_root / "content" / cooked_record->runtime_relative_path;
+    logger.Info("Resolved demo albedo from cooked registry asset id '" +
                 config_.demo_albedo_asset_id + "' to '" +
                 resolved_demo_albedo_texture_path.string() + "'.");
+  } else {
+    resolved_demo_albedo_texture_path =
+        assets.ResolveAssetPath(config_.demo_albedo_asset_id);
+    if (resolved_demo_albedo_texture_path.empty()) {
+      // Transitional fallback while phase 24A cooks registry artifacts.
+      resolved_demo_albedo_texture_path = config_.demo_albedo_asset_id;
+      if (!resolved_demo_albedo_texture_path.empty() &&
+          resolved_demo_albedo_texture_path.is_relative()) {
+        resolved_demo_albedo_texture_path =
+            paths.project_root / resolved_demo_albedo_texture_path;
+      }
+      logger.Info("Cooked registry missing asset id; fallback path used: " +
+                  resolved_demo_albedo_texture_path.string());
+    } else {
+      logger.Info("Resolved demo albedo asset id via mounted package/source: '" +
+                  config_.demo_albedo_asset_id + "' -> '" +
+                  resolved_demo_albedo_texture_path.string() + "'.");
+    }
   }
   const std::string resolved_demo_albedo_texture =
       resolved_demo_albedo_texture_path.string();

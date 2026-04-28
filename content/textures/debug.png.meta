@@ -1,0 +1,10 @@
+# Cookie Engine Asset Meta v0
+asset_id: 7f3a9d1c2e9b4a7f8d1234567890abcd
+type: Texture2D
+importer: TextureImporter
+importer_version: 1
+source_fingerprint: sha256:pending
+setting.compression: BC7
+setting.generate_mipmaps: true
+setting.srgb: true
+label: demo

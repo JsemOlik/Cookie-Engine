@@ -11,7 +11,7 @@ struct RendererConfig {
   std::string backend_name = "dx11";
   std::string window_title = "CookieRuntime";
   std::string camera_mode = "perspective";
-  std::string demo_albedo_asset_id = "textures/debug.png";
+  std::string demo_albedo_asset_id = "7f3a9d1c2e9b4a7f8d1234567890abcd";
   int window_width = 1280;
   int window_height = 720;
   ClearColor clear_color{};

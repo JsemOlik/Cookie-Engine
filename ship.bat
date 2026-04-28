@@ -84,6 +84,11 @@ if not exist "%EXPORT_ROOT%\content\base.pak" (
   set "EXIT_CODE=1"
   goto :end
 )
+if not exist "%EXPORT_ROOT%\content\cooked_assets.pakreg" (
+  echo [ERROR] Missing cooked asset registry: content\cooked_assets.pakreg
+  set "EXIT_CODE=1"
+  goto :end
+)
 if not exist "%EXPORT_ROOT%\content\textures\debug.png" (
   echo [ERROR] Missing texture asset: content\textures\debug.png
   set "EXIT_CODE=1"
