@@ -100,9 +100,7 @@ class EditorMainWindow final : public QMainWindow {
   float viewport_camera_pitch_radians_ = 0.0f;
   bool viewport_is_hovered_ = false;
   bool viewport_mouse_look_active_ = false;
-  bool viewport_has_last_mouse_pos_ = false;
-  float viewport_last_mouse_x_ = 0.0f;
-  float viewport_last_mouse_y_ = 0.0f;
+  bool viewport_cursor_captured_ = false;
   float viewport_pending_mouse_delta_x_ = 0.0f;
   float viewport_pending_mouse_delta_y_ = 0.0f;
   bool viewport_key_w_down_ = false;

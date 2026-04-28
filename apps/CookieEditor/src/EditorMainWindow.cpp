@@ -7,6 +7,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QCursor>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -1052,7 +1053,10 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
     case QEvent::Leave:
       viewport_is_hovered_ = false;
       viewport_mouse_look_active_ = false;
-      viewport_has_last_mouse_pos_ = false;
+      if (viewport_cursor_captured_) {
+        viewport_widget_->unsetCursor();
+        viewport_cursor_captured_ = false;
+      }
       viewport_pending_mouse_delta_x_ = 0.0f;
       viewport_pending_mouse_delta_y_ = 0.0f;
       break;
@@ -1061,9 +1065,13 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
       if (mouse_event->button() == Qt::RightButton) {
         viewport_mouse_look_active_ = viewport_is_hovered_ || viewport_widget_->hasFocus();
         viewport_widget_->setFocus();
-        viewport_last_mouse_x_ = mouse_event->position().x();
-        viewport_last_mouse_y_ = mouse_event->position().y();
-        viewport_has_last_mouse_pos_ = true;
+        if (viewport_mouse_look_active_) {
+          viewport_widget_->setCursor(Qt::BlankCursor);
+          viewport_cursor_captured_ = true;
+          const QPoint local_center(
+              viewport_widget_->width() / 2, viewport_widget_->height() / 2);
+          QCursor::setPos(viewport_widget_->mapToGlobal(local_center));
+        }
       }
       break;
     }
@@ -1071,28 +1079,33 @@ bool EditorMainWindow::eventFilter(QObject* watched, QEvent* event) {
       const auto* mouse_event = static_cast<QMouseEvent*>(event);
       if (mouse_event->button() == Qt::RightButton) {
         viewport_mouse_look_active_ = false;
-        viewport_has_last_mouse_pos_ = false;
+        if (viewport_cursor_captured_) {
+          viewport_widget_->unsetCursor();
+          viewport_cursor_captured_ = false;
+        }
       }
       break;
     }
     case QEvent::MouseMove: {
       const auto* mouse_event = static_cast<QMouseEvent*>(event);
       if (viewport_mouse_look_active_ && (viewport_is_hovered_ || viewport_widget_->hasFocus())) {
-        const float x = mouse_event->position().x();
-        const float y = mouse_event->position().y();
-        if (viewport_has_last_mouse_pos_) {
-          viewport_pending_mouse_delta_x_ += (x - viewport_last_mouse_x_);
-          viewport_pending_mouse_delta_y_ += (y - viewport_last_mouse_y_);
-        }
-        viewport_last_mouse_x_ = x;
-        viewport_last_mouse_y_ = y;
-        viewport_has_last_mouse_pos_ = true;
+        const QPoint local_center(
+            viewport_widget_->width() / 2, viewport_widget_->height() / 2);
+        const QPointF current_local = mouse_event->position();
+        viewport_pending_mouse_delta_x_ +=
+            static_cast<float>(current_local.x() - local_center.x());
+        viewport_pending_mouse_delta_y_ +=
+            static_cast<float>(current_local.y() - local_center.y());
+        QCursor::setPos(viewport_widget_->mapToGlobal(local_center));
       }
       break;
     }
     case QEvent::FocusOut:
       viewport_mouse_look_active_ = false;
-      viewport_has_last_mouse_pos_ = false;
+      if (viewport_cursor_captured_) {
+        viewport_widget_->unsetCursor();
+        viewport_cursor_captured_ = false;
+      }
       viewport_key_w_down_ = false;
       viewport_key_a_down_ = false;
       viewport_key_s_down_ = false;
@@ -1156,22 +1169,20 @@ void EditorMainWindow::UpdateViewportCamera(float delta_time_seconds) {
 
   constexpr float kMoveSpeed = 4.5f;
   constexpr float kFastMoveSpeed = 11.0f;
-  const float horizontal_sin = std::sin(viewport_camera_yaw_radians_);
-  const float horizontal_cos = std::cos(viewport_camera_yaw_radians_);
-  const EditorVec3 forward_flat = NormalizeVec3({
-      horizontal_sin,
-      0.0f,
-      horizontal_cos,
+  const EditorVec3 forward = NormalizeVec3({
+      std::cos(viewport_camera_pitch_radians_) * std::sin(viewport_camera_yaw_radians_),
+      std::sin(viewport_camera_pitch_radians_),
+      std::cos(viewport_camera_pitch_radians_) * std::cos(viewport_camera_yaw_radians_),
   });
   const EditorVec3 world_up{0.0f, 1.0f, 0.0f};
-  const EditorVec3 right = NormalizeVec3(CrossVec3(world_up, forward_flat));
+  const EditorVec3 right = NormalizeVec3(CrossVec3(world_up, forward));
 
   EditorVec3 movement{};
   if (viewport_key_w_down_) {
-    movement = AddVec3(movement, forward_flat);
+    movement = AddVec3(movement, forward);
   }
   if (viewport_key_s_down_) {
-    movement = SubtractVec3(movement, forward_flat);
+    movement = SubtractVec3(movement, forward);
   }
   if (viewport_key_d_down_) {
     movement = AddVec3(movement, right);
